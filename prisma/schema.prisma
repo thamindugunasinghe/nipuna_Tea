@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(50)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String   @db.VarChar(100)
+  role         String   @default("staff") @db.VarChar(20) // admin, staff
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Customer {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  nic         String?  @unique @db.VarChar(20)
+  phone       String?  @db.VarChar(20)
+  address     String?  @db.Text
+  type        String   @default("regular") @db.VarChar(20) // regular, non-regular
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  creditPurchases CreditPurchase[]
+  teaCollections  TeaCollection[]
+  monthlyPayments MonthlyPayment[]
+
+  @@map("customers")
+}
+
+model Lorry {
+  id          Int      @id @default(autoincrement())
+  lorryNumber String   @unique @map("lorry_number") @db.VarChar(20)
+  capacity    Float?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  drivers        Driver[]
+  teaCollections TeaCollection[]
+
+  @@map("lorries")
+}
+
+model Driver {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  phone     String?  @db.VarChar(20)
+  nic       String?  @unique @db.VarChar(20)
+  lorryId   Int?     @map("lorry_id")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lorry             Lorry?             @relation(fields: [lorryId], references: [id])
+  teaCollections    TeaCollection[]
+  driverCommissions DriverCommission[]
+
+  @@map("drivers")
+}
+
+model Fertiliser {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  pricePerUnit Float    @map("price_per_unit")
+  weightPerBag Float?   @map("weight_per_bag")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  creditPurchases CreditPurchase[]
+
+  @@map("fertilisers")
+}
+
+model CreditPurchase {
+  id           Int       @id @default(autoincrement())
+  customerId   Int       @map("customer_id")
+  itemType     String    @map("item_type") @db.VarChar(20) // grocery, fertiliser
+  fertiliserId Int?      @map("fertiliser_id")
+  description  String?   @db.VarChar(255)
+  quantity     Float     @default(1)
+  unitPrice    Float     @map("unit_price")
+  totalCost    Float     @map("total_cost")
+  purchaseDate DateTime  @default(now()) @map("purchase_date")
+  month        Int
+  year         Int
+  settled      Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  fertiliser Fertiliser? @relation(fields: [fertiliserId], references: [id])
+
+  @@map("credit_purchases")
+}
+
+model TeaCollection {
+  id             Int      @id @default(autoincrement())
+  customerId     Int      @map("customer_id")
+  driverId       Int?     @map("driver_id")
+  lorryId        Int?     @map("lorry_id")
+  kilosByDriver  Float    @map("kilos_by_driver")
+  kilosValidated Float?   @map("kilos_validated")
+  collectionDate DateTime @map("collection_date")
+  month          Int
+  year           Int
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  driver   Driver?  @relation(fields: [driverId], references: [id])
+  lorry    Lorry?   @relation(fields: [lorryId], references: [id])
+
+  @@map("tea_collections")
+}
+
+model MonthlyPayment {
+  id                  Int      @id @default(autoincrement())
+  customerId          Int      @map("customer_id")
+  month               Int
+  year                Int
+  totalKilos          Float    @map("total_kilos")
+  pricePerKilo        Float    @map("price_per_kilo")
+  grossPayment        Float    @map("gross_payment")
+  groceryDeduction    Float    @default(0) @map("grocery_deduction")
+  fertiliserDeduction Float    @default(0) @map("fertiliser_deduction")
+  otherDeductionPct   Float    @default(0) @map("other_deduction_pct")
+  otherDeductionAmt   Float    @default(0) @map("other_deduction_amt")
+  netPayment          Float    @map("net_payment")
+  paid                Boolean  @default(false)
+  paidAt              DateTime? @map("paid_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([customerId, month, year])
+  @@map("monthly_payments")
+}
+
+model DriverCommission {
+  id               Int      @id @default(autoincrement())
+  driverId         Int      @map("driver_id")
+  month            Int
+  year             Int
+  totalKilos       Float    @map("total_kilos")
+  pricePerKilo     Float    @map("price_per_kilo")
+  commissionRate   Float    @default(5) @map("commission_rate")
+  commissionAmount Float    @map("commission_amount")
+  paid             Boolean  @default(false)
+  paidAt           DateTime? @map("paid_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@unique([driverId, month, year])
+  @@map("driver_commissions")
+}
+
+model Settings {
+  id    Int    @id @default(autoincrement())
+  key   String @unique @db.VarChar(50)
+  value String @db.VarChar(255)
+
+  @@map("settings")
+}
