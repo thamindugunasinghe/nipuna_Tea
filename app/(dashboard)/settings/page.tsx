@@ -25,8 +25,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/settings').then(r => r.json()),
-      fetch('/api/fertilisers').then(r => r.json()),
+      fetch('/api/settings').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+      fetch('/api/fertilisers').then(r => r.ok ? r.json() : []).catch(() => []),
     ]).then(([s, f]) => {
       if (s && typeof s === 'object') {
         const mapped: any = {};
@@ -34,7 +34,7 @@ export default function SettingsPage() {
         else Object.assign(mapped, s);
         setSettings((prev: any) => ({ ...prev, ...mapped }));
       }
-      setFertilisers(f);
+      setFertilisers(Array.isArray(f) ? f : []);
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 

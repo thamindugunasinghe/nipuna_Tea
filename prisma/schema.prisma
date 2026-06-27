@@ -3,16 +3,17 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
   id           Int      @id @default(autoincrement())
-  username     String   @unique @db.VarChar(50)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  name         String   @db.VarChar(100)
-  role         String   @default("staff") @db.VarChar(20) // admin, staff
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         String   @default("staff") // admin, staff
   active       Boolean  @default(true)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -22,11 +23,11 @@ model User {
 
 model Customer {
   id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(100)
-  nic         String?  @unique @db.VarChar(20)
-  phone       String?  @db.VarChar(20)
-  address     String?  @db.Text
-  type        String   @default("regular") @db.VarChar(20) // regular, non-regular
+  name        String
+  nic         String?  @unique
+  phone       String?
+  address     String?
+  type        String   @default("regular") // regular, non-regular
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -40,36 +41,40 @@ model Customer {
 
 model Lorry {
   id          Int      @id @default(autoincrement())
-  lorryNumber String   @unique @map("lorry_number") @db.VarChar(20)
+  lorryNumber String   @unique @map("lorry_number")
   capacity    Float?
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  drivers        Driver[]
-  teaCollections TeaCollection[]
+  drivers          Driver[]
+  teaCollections   TeaCollection[]
+  lorryValidations LorryValidation[]
+  driverSessions   DriverSession[]
 
   @@map("lorries")
 }
 
 model Driver {
   id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(100)
-  phone     String?  @db.VarChar(20)
-  nic       String?  @unique @db.VarChar(20)
+  name      String
+  phone     String?
+  nic       String?  @unique
   lorryId   Int?     @map("lorry_id")
   active    Boolean  @default(true)
+  pin       String?
   createdAt DateTime @default(now()) @map("created_at")
 
   lorry             Lorry?             @relation(fields: [lorryId], references: [id])
   teaCollections    TeaCollection[]
   driverCommissions DriverCommission[]
+  sessions          DriverSession[]
 
   @@map("drivers")
 }
 
 model Fertiliser {
   id           Int      @id @default(autoincrement())
-  name         String   @db.VarChar(100)
+  name         String
   pricePerUnit Float    @map("price_per_unit")
   weightPerBag Float?   @map("weight_per_bag")
   active       Boolean  @default(true)
@@ -81,22 +86,24 @@ model Fertiliser {
 }
 
 model CreditPurchase {
-  id           Int       @id @default(autoincrement())
-  customerId   Int       @map("customer_id")
-  itemType     String    @map("item_type") @db.VarChar(20) // grocery, fertiliser
-  fertiliserId Int?      @map("fertiliser_id")
-  description  String?   @db.VarChar(255)
-  quantity     Float     @default(1)
-  unitPrice    Float     @map("unit_price")
-  totalCost    Float     @map("total_cost")
-  purchaseDate DateTime  @default(now()) @map("purchase_date")
-  month        Int
-  year         Int
-  settled      Boolean   @default(false)
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id               Int       @id @default(autoincrement())
+  customerId       Int       @map("customer_id")
+  itemType         String    @map("item_type") // grocery, fertiliser
+  fertiliserId     Int?      @map("fertiliser_id")
+  description      String?
+  quantity         Float     @default(1)
+  unitPrice        Float     @map("unit_price")
+  totalCost        Float     @map("total_cost")
+  purchaseDate     DateTime  @default(now()) @map("purchase_date")
+  month            Int
+  year             Int
+  settled          Boolean   @default(false)
+  monthlyPaymentId Int?      @map("monthly_payment_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  fertiliser Fertiliser? @relation(fields: [fertiliserId], references: [id])
+  customer       Customer        @relation(fields: [customerId], references: [id])
+  fertiliser     Fertiliser?     @relation(fields: [fertiliserId], references: [id])
+  monthlyPayment MonthlyPayment? @relation(fields: [monthlyPaymentId], references: [id])
 
   @@map("credit_purchases")
 }
@@ -108,6 +115,7 @@ model TeaCollection {
   lorryId        Int?     @map("lorry_id")
   kilosByDriver  Float    @map("kilos_by_driver")
   kilosValidated Float?   @map("kilos_validated")
+  waterScore     Int      @default(0) @map("water_score") // 0=dry, 1=slight, 2=moderate, 3=very wet
   collectionDate DateTime @map("collection_date")
   month          Int
   year           Int
@@ -118,6 +126,22 @@ model TeaCollection {
   lorry    Lorry?   @relation(fields: [lorryId], references: [id])
 
   @@map("tea_collections")
+}
+
+model LorryValidation {
+  id                  Int      @id @default(autoincrement())
+  lorryId             Int      @map("lorry_id")
+  validationDate      DateTime @map("validation_date")
+  totalDriverKilos    Float    @map("total_driver_kilos")
+  totalWarehouseKilos Float    @map("total_warehouse_kilos")
+  weightLoss          Float    @map("weight_loss")
+  collectionsCount    Int      @map("collections_count")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  lorry Lorry @relation(fields: [lorryId], references: [id])
+
+  @@unique([lorryId, validationDate])
+  @@map("lorry_validations")
 }
 
 model MonthlyPayment {
@@ -133,11 +157,13 @@ model MonthlyPayment {
   otherDeductionPct   Float    @default(0) @map("other_deduction_pct")
   otherDeductionAmt   Float    @default(0) @map("other_deduction_amt")
   netPayment          Float    @map("net_payment")
+  settledCreditIds    Json?    @map("settled_credit_ids")
   paid                Boolean  @default(false)
   paidAt              DateTime? @map("paid_at")
   createdAt           DateTime @default(now()) @map("created_at")
 
-  customer Customer @relation(fields: [customerId], references: [id])
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  settledCredits  CreditPurchase[]
 
   @@unique([customerId, month, year])
   @@map("monthly_payments")
@@ -164,8 +190,27 @@ model DriverCommission {
 
 model Settings {
   id    Int    @id @default(autoincrement())
-  key   String @unique @db.VarChar(50)
-  value String @db.VarChar(255)
+  key   String @unique
+  value String
 
   @@map("settings")
+}
+
+model DriverSession {
+  id               Int       @id @default(autoincrement())
+  driverId         Int       @map("driver_id")
+  lorryId          Int?      @map("lorry_id")
+  sessionDate      DateTime  @map("session_date")
+  startedAt        DateTime  @default(now()) @map("started_at")
+  stoppedAt        DateTime? @map("stopped_at")
+  isActive         Boolean   @default(true) @map("is_active")
+  collectionsCount Int       @default(0) @map("collections_count")
+  totalKilos       Float     @default(0) @map("total_kilos")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  driver Driver @relation(fields: [driverId], references: [id])
+  lorry  Lorry? @relation(fields: [lorryId], references: [id])
+
+  @@unique([driverId, sessionDate])
+  @@map("driver_sessions")
 }

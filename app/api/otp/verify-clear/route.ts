@@ -36,8 +36,10 @@ export async function POST(req: NextRequest) {
     await prisma.driverCommission.deleteMany();
     await prisma.monthlyPayment.deleteMany();
     await prisma.creditPurchase.deleteMany();
+    await prisma.lorryValidation.deleteMany();
     await prisma.teaCollection.deleteMany();
     await prisma.fertiliser.deleteMany();
+    await prisma.driverSession.deleteMany();
     await prisma.driver.deleteMany();
     await prisma.lorry.deleteMany();
     await prisma.customer.deleteMany();

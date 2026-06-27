@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Users,
   Leaf,
+  Scale,
   ShoppingCart,
   Truck,
   DollarSign,
@@ -16,12 +17,15 @@ import {
   Settings,
   LogOut,
   UserCog,
+  Wifi,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { href: '/customers', icon: Users, labelKey: 'nav.customers' },
   { href: '/collections', icon: Leaf, labelKey: 'nav.collections' },
+  { href: '/validation', icon: Scale, labelKey: 'nav.validation' },
+  { href: '/online-drivers', icon: Wifi, labelKey: 'nav.onlineDrivers' },
   { href: '/purchases', icon: ShoppingCart, labelKey: 'nav.purchases' },
   { href: '/fleet', icon: Truck, labelKey: 'nav.fleet' },
   { href: '/payments', icon: DollarSign, labelKey: 'nav.payments' },

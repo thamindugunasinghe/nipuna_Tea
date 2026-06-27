@@ -13,11 +13,12 @@ export async function POST(req: NextRequest) {
   const results = [];
 
   for (const driver of drivers) {
+    // Only count validated collections
     const collections = await prisma.teaCollection.findMany({
-      where: { driverId: driver.id, month, year },
+      where: { driverId: driver.id, month, year, kilosValidated: { not: null } },
     });
 
-    const totalKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || c.kilosByDriver), 0);
+    const totalKilos = collections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
     if (totalKilos === 0) continue;
 
     // Commission = Total Kilos × Price × Rate%

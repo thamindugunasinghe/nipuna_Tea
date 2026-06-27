@@ -13,9 +13,12 @@ interface ReceiptData {
   groceryDeduction?: number;
   fertiliserDeduction?: number;
   otherDeduction?: number;
+  otherDeductionPct?: number;
   netPayment?: number;
   month?: string;
   year?: number;
+  collections?: any[];
+  settledCredits?: any[];
   // Commission
   driverName?: string;
   commissionRate?: number;
@@ -29,7 +32,7 @@ interface ReceiptData {
 }
 
 export function printReceipt(data: ReceiptData) {
-  const printWindow = window.open('', '_blank', 'width=420,height=600');
+  const printWindow = window.open('', '_blank', 'width=420,height=800');
   if (!printWindow) return;
 
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -37,6 +40,52 @@ export function printReceipt(data: ReceiptData) {
   let bodyContent = '';
 
   if (data.type === 'payment') {
+    // Build collections table
+    let collectionsHtml = '';
+    if (data.collections && data.collections.length > 0) {
+      collectionsHtml = `
+        <div class="section-title">Tea Collections / තේ එකතු කිරීම්</div>
+        <table>
+          <tr class="table-header">
+            <td class="label-cell" style="font-weight:700;font-size:10px">Date</td>
+            <td class="label-cell" style="font-weight:700;font-size:10px">Driver</td>
+            <td class="value-cell" style="font-weight:700;font-size:10px">Kilos</td>
+          </tr>
+          ${data.collections.map(c => `
+            <tr>
+              <td class="label-cell" style="font-size:11px">${new Date(c.collectionDate).toLocaleDateString()}</td>
+              <td class="label-cell" style="font-size:11px">${c.driver?.name || '-'}</td>
+              <td class="value-cell" style="font-size:11px">${c.kilosValidated ?? c.kilosByDriver} kg</td>
+            </tr>
+          `).join('')}
+        </table>
+        <div class="divider dashed"></div>
+      `;
+    }
+
+    // Build settled credits table
+    let creditsHtml = '';
+    if (data.settledCredits && data.settledCredits.length > 0) {
+      creditsHtml = `
+        <div class="section-title">Settled Credits / බේරුම් කළ ණය</div>
+        <table>
+          <tr class="table-header">
+            <td class="label-cell" style="font-weight:700;font-size:10px">Date</td>
+            <td class="label-cell" style="font-weight:700;font-size:10px">Item</td>
+            <td class="value-cell deduct" style="font-weight:700;font-size:10px">Amount</td>
+          </tr>
+          ${data.settledCredits.map(c => `
+            <tr>
+              <td class="label-cell" style="font-size:11px">${new Date(c.purchaseDate).toLocaleDateString()}</td>
+              <td class="label-cell" style="font-size:11px">${c.description || c.fertiliser?.name || (c.itemType === 'grocery' ? 'Grocery' : 'Fertiliser')}</td>
+              <td class="value-cell deduct" style="font-size:11px">- Rs. ${c.totalCost.toLocaleString()}</td>
+            </tr>
+          `).join('')}
+        </table>
+        <div class="divider dashed"></div>
+      `;
+    }
+
     bodyContent = `
       <div class="receipt-type">Monthly Tea Payment Receipt</div>
       <div class="receipt-type-si">මාසික තේ දෙනුම් කුවිතාන්සිය</div>
@@ -56,6 +105,8 @@ export function printReceipt(data: ReceiptData) {
 
       <div class="divider"></div>
 
+      ${collectionsHtml}
+
       <table>
         <tr>
           <td class="label-cell">Total Tea (kg) / මුළු තේ</td>
@@ -74,6 +125,8 @@ export function printReceipt(data: ReceiptData) {
       <div class="divider dashed"></div>
       <div class="section-title">Deductions / අඩු කිරීම්</div>
 
+      ${creditsHtml}
+
       <table>
         <tr>
           <td class="label-cell">Grocery / සිල්ලර බඩු</td>
@@ -84,7 +137,7 @@ export function printReceipt(data: ReceiptData) {
           <td class="value-cell deduct">- Rs. ${data.fertiliserDeduction?.toLocaleString()}</td>
         </tr>
         <tr>
-          <td class="label-cell">Other (5%) / වෙනත්</td>
+          <td class="label-cell">Other (${data.otherDeductionPct || 5}%) / වෙනත්</td>
           <td class="value-cell deduct">- Rs. ${data.otherDeduction?.toLocaleString()}</td>
         </tr>
       </table>
@@ -303,6 +356,12 @@ export function printReceipt(data: ReceiptData) {
     table tr td {
       padding: 6px 0;
       font-size: 12px;
+    }
+
+    .table-header td {
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
     }
 
     .label-cell {

@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { Plus, Leaf, CheckCircle } from 'lucide-react';
+import { Plus, Leaf, CheckCircle, Droplets } from 'lucide-react';
 import Modal from '@/components/Modal';
 import Toast, { useToast } from '@/components/Toast';
+
+const waterLabels = ['Dry / වියළි', 'Slight / සුළු', 'Moderate / මධ්‍යම', 'Very Wet / ඉතා තෙත්'];
+const waterColors = ['badge-green', 'badge-blue', 'badge-amber', 'badge-red'];
 
 export default function CollectionsPage() {
   const { t } = useTranslation();
@@ -17,7 +20,8 @@ export default function CollectionsPage() {
   const [showModal, setShowModal] = useState(false);
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [form, setForm] = useState({
-    customerId: '', driverId: '', lorryId: '', kilosByDriver: '', collectionDate: new Date().toISOString().split('T')[0],
+    customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterScore: '0',
+    collectionDate: new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
@@ -44,6 +48,7 @@ export default function CollectionsPage() {
           driverId: form.driverId ? parseInt(form.driverId) : null,
           lorryId: form.lorryId ? parseInt(form.lorryId) : null,
           kilosByDriver: parseFloat(form.kilosByDriver),
+          waterScore: parseInt(form.waterScore),
           collectionDate: form.collectionDate,
         }),
       });
@@ -52,27 +57,10 @@ export default function CollectionsPage() {
         setShowModal(false);
         const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
-        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', collectionDate: new Date().toISOString().split('T')[0] });
+        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterScore: '0', collectionDate: new Date().toISOString().split('T')[0] });
       } else {
         const data = await res.json();
         showToast(data.error || t('common.error'), 'error');
-      }
-    } catch (e) { showToast(t('common.error'), 'error'); }
-  };
-
-  const handleValidate = async (id: number, kilos: string) => {
-    const validated = prompt(t('collections.kilosValidated'), kilos);
-    if (validated === null) return;
-    try {
-      const res = await fetch(`/api/collections/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kilosValidated: parseFloat(validated) }),
-      });
-      if (res.ok) {
-        showToast(t('collections.validationSuccess'), 'success');
-        const data = await fetch('/api/collections').then(r => r.json());
-        setCollections(data);
       }
     } catch (e) { showToast(t('common.error'), 'error'); }
   };
@@ -118,8 +106,8 @@ export default function CollectionsPage() {
               <th>{t('collections.driver')}</th>
               <th>{t('collections.lorry')}</th>
               <th>{t('collections.kilosByDriver')}</th>
+              <th>Water / ජලය</th>
               <th>{t('collections.kilosValidated')}</th>
-              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -133,17 +121,16 @@ export default function CollectionsPage() {
                 <td>{c.lorry?.lorryNumber || '-'}</td>
                 <td>{c.kilosByDriver} {t('common.kg')}</td>
                 <td>
+                  <span className={`badge ${waterColors[c.waterScore || 0]}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Droplets size={12} />
+                    {c.waterScore || 0} — {waterLabels[c.waterScore || 0]}
+                  </span>
+                </td>
+                <td>
                   {c.kilosValidated != null
                     ? <span className="badge badge-green"><CheckCircle size={14} style={{ marginRight: 4 }} />{c.kilosValidated} {t('common.kg')}</span>
                     : <span className="badge badge-amber">{t('collections.notValidated')}</span>
                   }
-                </td>
-                <td>
-                  {c.kilosValidated == null && (
-                    <button className="btn btn-sm btn-primary" onClick={() => handleValidate(c.id, String(c.kilosByDriver))}>
-                      {t('collections.validate')}
-                    </button>
-                  )}
                 </td>
               </tr>
             ))}
@@ -181,10 +168,21 @@ export default function CollectionsPage() {
             </select>
           </div>
         </div>
-        <div className="form-group">
-          <label className="form-label">{t('collections.kilosByDriver')} *</label>
-          <input type="number" step="0.1" className="form-input" placeholder={t('collections.enterKilos')}
-            value={form.kilosByDriver} onChange={(e) => setForm({ ...form, kilosByDriver: e.target.value })} />
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">{t('collections.kilosByDriver')} *</label>
+            <input type="number" step="0.1" className="form-input" placeholder={t('collections.enterKilos')}
+              value={form.kilosByDriver} onChange={(e) => setForm({ ...form, kilosByDriver: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Water Score / ජල ලකුණු *</label>
+            <select className="form-select" value={form.waterScore} onChange={(e) => setForm({ ...form, waterScore: e.target.value })}>
+              <option value="0">0 — Dry / වියළි 🍂</option>
+              <option value="1">1 — Slight / සුළු 💧</option>
+              <option value="2">2 — Moderate / මධ්‍යම 💧💧</option>
+              <option value="3">3 — Very Wet / ඉතා තෙත් 💧💧💧</option>
+            </select>
+          </div>
         </div>
       </Modal>
     </div>
