@@ -2,12 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { Scale, Droplets, CheckCircle, Search, AlertTriangle, Loader2 } from 'lucide-react';
+import { Scale, Droplets, CheckCircle, Search, AlertTriangle, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
 import Toast, { useToast } from '@/components/Toast';
-
-const waterLabels = ['Dry / වියළි', 'Slight / සුළු', 'Moderate / මධ්‍යම', 'Very Wet / ඉතා තෙත්'];
-const waterColors = ['badge-green', 'badge-blue', 'badge-amber', 'badge-red'];
-const dropIcons = ['🍂', '💧', '💧💧', '💧💧💧'];
 
 export default function ValidationPage() {
   const { t } = useTranslation();
@@ -18,7 +14,7 @@ export default function ValidationPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState<any>(null);
-  const [warehouseKilos, setWarehouseKilos] = useState('');
+  const [lorryScaleKilos, setLorryScaleKilos] = useState('');
   const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
@@ -32,7 +28,7 @@ export default function ValidationPage() {
     }
     setLoading(true);
     setResult(null);
-    setWarehouseKilos('');
+    setLorryScaleKilos('');
     try {
       const url = lorryId === 'warehouse'
           ? `/api/validation?warehouse=true&date=${date}`
@@ -42,7 +38,7 @@ export default function ValidationPage() {
         const d = await res.json();
         setData(d);
         if (d.existingValidation) {
-          setWarehouseKilos(String(d.existingValidation.totalWarehouseKilos));
+          setLorryScaleKilos(String(d.existingValidation.lorryScaleKilos || d.existingValidation.totalWarehouseKilos || ''));
         }
       }
     } catch (e) {
@@ -52,8 +48,8 @@ export default function ValidationPage() {
   };
 
   const handleValidate = async () => {
-    if (!warehouseKilos || parseFloat(warehouseKilos) <= 0) {
-      showToast('Enter the warehouse weight / ගබඩා බර ඇතුළත් කරන්න', 'warning');
+    if (!lorryScaleKilos || parseFloat(lorryScaleKilos) <= 0) {
+      showToast('Enter the lorry scale weight / ලොරි කිරුම බර ඇතුළත් කරන්න', 'warning');
       return;
     }
     setSubmitting(true);
@@ -65,7 +61,7 @@ export default function ValidationPage() {
           lorryId: lorryId === 'warehouse' ? null : parseInt(lorryId),
           warehouse: lorryId === 'warehouse',
           date,
-          warehouseKilos: parseFloat(warehouseKilos),
+          lorryScaleKilos: parseFloat(lorryScaleKilos),
         }),
       });
       if (res.ok) {
@@ -84,44 +80,9 @@ export default function ValidationPage() {
     setSubmitting(false);
   };
 
-  // Preview calculations
-  const previewDeductions = () => {
-    if (!data?.collections || !warehouseKilos) return null;
-    const wh = parseFloat(warehouseKilos);
-    if (wh <= 0 || isNaN(wh)) return null;
-
-    const totalDriverKilos = data.totalDriverKilos;
-    const totalLoss = Math.max(0, totalDriverKilos - wh);
-
-    const weightedScores = data.collections.map((c: any) => ({
-      id: c.id,
-      name: c.customer?.name,
-      kilos: c.kilosByDriver,
-      waterScore: c.waterScore || 0,
-      weightedScore: c.kilosByDriver * (c.waterScore || 0),
-    }));
-
-    const totalWeightedScore = weightedScores.reduce((sum: number, w: any) => sum + w.weightedScore, 0);
-
-    return weightedScores.map((w: any) => {
-      let deduction: number;
-      if (totalLoss === 0) {
-        deduction = 0;
-      } else if (totalWeightedScore > 0) {
-        deduction = (w.weightedScore / totalWeightedScore) * totalLoss;
-      } else {
-        deduction = (w.kilos / totalDriverKilos) * totalLoss;
-      }
-      return {
-        ...w,
-        deduction: Math.round(deduction * 100) / 100,
-        validatedKilos: Math.round((w.kilos - deduction) * 100) / 100,
-      };
-    });
-  };
-
-  const preview = previewDeductions();
-  const totalLoss = data ? Math.max(0, data.totalDriverKilos - parseFloat(warehouseKilos || '0')) : 0;
+  // Calculate preview
+  const parsedLorryScale = parseFloat(lorryScaleKilos || '0');
+  const previewDiff = data ? Math.round((parsedLorryScale - data.totalGrossKilos) * 100) / 100 : 0;
 
   return (
     <div>
@@ -170,7 +131,7 @@ export default function ValidationPage() {
           ) : (
             <>
               {/* Already validated warning */}
-              {data.allValidated && data.existingValidation && (
+              {data.existingValidation && (
                 <div style={{
                   background: 'var(--primary-50)', border: '1px solid var(--primary-200)',
                   borderRadius: '10px', padding: '14px 18px', marginBottom: '16px',
@@ -178,8 +139,8 @@ export default function ValidationPage() {
                 }}>
                   <CheckCircle size={20} />
                   <div>
-                    <strong>Already validated!</strong> Warehouse: {data.existingValidation.totalWarehouseKilos} kg,
-                    Loss: {data.existingValidation.weightLoss} kg.
+                    <strong>Already validated!</strong> Lorry Scale: {data.existingValidation.lorryScaleKilos || data.existingValidation.totalWarehouseKilos} kg,
+                    Difference: {data.existingValidation.lorryCumulativeDiff || 0} kg.
                     <span style={{ fontSize: '12px', color: 'var(--gray-500)', marginLeft: '6px' }}>
                       Re-submitting will update the existing validation.
                     </span>
@@ -189,48 +150,80 @@ export default function ValidationPage() {
 
               {/* Summary Stats */}
               <div className="stats-grid" style={{ marginBottom: '20px' }}>
+                {/* Gross Kilos */}
+                <div className="stat-card">
+                  <div className="stat-icon" style={{ background: '#f1f5f9', color: '#64748b' }}><Scale size={24} /></div>
+                  <div className="stat-content">
+                    <h3>Gross Total / මුළු බර</h3>
+                    <div className="stat-value">{data.totalGrossKilos.toLocaleString()}</div>
+                    <div className="stat-sub">kg (before deductions) — {data.collectionsCount} collections</div>
+                  </div>
+                </div>
+
+                {/* Water Deduction Total */}
+                <div className="stat-card">
+                  <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}><Droplets size={24} /></div>
+                  <div className="stat-content">
+                    <h3>Water Deduction / ජල අඩු කිරීම</h3>
+                    <div className="stat-value" style={{ color: '#dc2626' }}>- {data.totalWaterDeduction.toLocaleString()}</div>
+                    <div className="stat-sub">kg deducted by rider</div>
+                  </div>
+                </div>
+
+                {/* Net Kilos (Cumulative) */}
                 <div className="stat-card">
                   <div className="stat-icon green"><Scale size={24} /></div>
                   <div className="stat-content">
-                    <h3>Driver Total / රියදුරු එකතුව</h3>
-                    <div className="stat-value">{data.totalDriverKilos.toLocaleString()}</div>
-                    <div className="stat-sub">kg — {data.collectionsCount} collections</div>
+                    <h3>Net Total / ශුද්ධ බර</h3>
+                    <div className="stat-value">{data.totalNetKilos.toLocaleString()}</div>
+                    <div className="stat-sub">kg (after deductions)</div>
                   </div>
                 </div>
+
+                {/* Lorry Scale Input */}
                 <div className="stat-card">
                   <div className="stat-icon blue"><Scale size={24} /></div>
                   <div className="stat-content">
-                    <h3>Warehouse Weight / ගබඩා බර</h3>
+                    <h3>Lorry Scale / ලොරි කිරුම බර</h3>
                     <input
                       type="number"
                       step="0.1"
                       className="form-input"
-                      value={warehouseKilos}
-                      onChange={(e) => setWarehouseKilos(e.target.value)}
-                      placeholder="Enter weight..."
+                      value={lorryScaleKilos}
+                      onChange={(e) => setLorryScaleKilos(e.target.value)}
+                      placeholder="Enter lorry weight..."
                       style={{ maxWidth: '180px', fontSize: '20px', fontWeight: 700, marginTop: '4px' }}
                     />
                   </div>
                 </div>
-                {warehouseKilos && (
+
+                {/* Difference */}
+                {lorryScaleKilos && (
                   <div className="stat-card">
-                    <div className="stat-icon" style={{ background: totalLoss > 0 ? '#fee2e2' : 'var(--primary-100)', color: totalLoss > 0 ? '#dc2626' : 'var(--primary-700)' }}>
-                      <Droplets size={24} />
+                    <div className="stat-icon" style={{
+                      background: Math.abs(previewDiff) > 10 ? '#fee2e2' : '#dcfce7',
+                      color: Math.abs(previewDiff) > 10 ? '#dc2626' : '#16a34a',
+                    }}>
+                      {previewDiff >= 0 ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
                     </div>
                     <div className="stat-content">
-                      <h3>Weight Loss / බර අඩුවීම</h3>
-                      <div className="stat-value" style={{ color: totalLoss > 0 ? '#dc2626' : 'var(--primary-700)' }}>
-                        {totalLoss.toLocaleString()} kg
+                      <h3>Difference / වෙනස</h3>
+                      <div className="stat-value" style={{
+                        color: Math.abs(previewDiff) > 10 ? '#dc2626' : '#16a34a',
+                      }}>
+                        {previewDiff > 0 ? '+' : ''}{previewDiff} kg
                       </div>
                       <div className="stat-sub">
-                        {data.totalDriverKilos > 0 ? ((totalLoss / data.totalDriverKilos) * 100).toFixed(1) : 0}% loss
+                        {previewDiff > 0 ? 'Lorry shows more than collected gross / ලොරිය එකතු කළ මුළු බරට වඩා වැඩිය' :
+                         previewDiff < 0 ? 'Lorry shows less than collected gross / ලොරිය එකතු කළ මුළු බරට වඩා අඩුය' :
+                         'No difference / වෙනසක් නැත'}
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Collections Table with Preview */}
+              {/* Collections Table */}
               <div className="card" style={{ marginBottom: '20px' }}>
                 <div className="card-header">
                   <h2>Collections / එකතු කිරීම්</h2>
@@ -242,95 +235,77 @@ export default function ValidationPage() {
                         <th>#</th>
                         <th>Customer</th>
                         <th>Driver</th>
-                        <th>Driver Kilos</th>
-                        <th>Water Score</th>
-                        {preview && <th style={{ color: '#dc2626' }}>Deduction</th>}
-                        <th>Validated Kilos</th>
+                        <th>Gross Kilos</th>
+                        <th style={{ color: '#dc2626' }}>Water Deduction</th>
+                        <th>Net Kilos</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.collections.map((c: any, i: number) => {
-                        const p = preview?.find((x: any) => x.id === c.id);
+                        const deduction = c.waterDeduction || 0;
+                        const netKilos = c.kilosValidated ?? (c.kilosByDriver - deduction);
                         return (
                           <tr key={c.id}>
                             <td>{i + 1}</td>
                             <td style={{ fontWeight: 600 }}>{c.customer?.name}</td>
                             <td>{c.driver?.name || '-'}</td>
                             <td>{c.kilosByDriver} kg</td>
-                            <td>
-                              <span className={`badge ${waterColors[c.waterScore || 0]}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                {dropIcons[c.waterScore || 0]} {c.waterScore || 0}
-                              </span>
+                            <td style={{ color: '#dc2626', fontWeight: 600 }}>
+                              {deduction > 0 ? `- ${deduction} kg` : '—'}
                             </td>
-                            {preview && (
-                              <td style={{ color: '#dc2626', fontWeight: 600 }}>
-                                {p && p.deduction > 0 ? `- ${p.deduction} kg` : '—'}
-                              </td>
-                            )}
                             <td>
-                              {c.kilosValidated != null ? (
-                                <span className="badge badge-green">
-                                  <CheckCircle size={12} style={{ marginRight: 4 }} />
-                                  {c.kilosValidated} kg
-                                </span>
-                              ) : p ? (
-                                <span style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
-                                  {p.validatedKilos} kg
-                                </span>
-                              ) : (
-                                <span className="badge badge-amber">Pending</span>
-                              )}
+                              <span className="badge badge-green">
+                                <CheckCircle size={12} style={{ marginRight: 4 }} />
+                                {netKilos} kg
+                              </span>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
-                    {preview && (
-                      <tfoot>
-                        <tr style={{ fontWeight: 700, background: 'var(--gray-50)' }}>
-                          <td colSpan={3}>Total</td>
-                          <td>{data.totalDriverKilos} kg</td>
-                          <td></td>
-                          <td style={{ color: '#dc2626' }}>- {totalLoss} kg</td>
-                          <td style={{ color: 'var(--primary-700)' }}>
-                            {(data.totalDriverKilos - totalLoss).toLocaleString()} kg
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
+                    <tfoot>
+                      <tr style={{ fontWeight: 700, background: 'var(--gray-50)' }}>
+                        <td colSpan={3}>Total</td>
+                        <td>{data.totalGrossKilos} kg</td>
+                        <td style={{ color: '#dc2626' }}>- {data.totalWaterDeduction} kg</td>
+                        <td style={{ color: 'var(--primary-700)' }}>
+                          {data.totalNetKilos.toLocaleString()} kg
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>
 
-              {/* Algorithm Explanation */}
-              {preview && totalLoss > 0 && (
-                <div style={{
-                  background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px',
-                  padding: '14px 18px', marginBottom: '20px', fontSize: '13px', color: '#92400e',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <AlertTriangle size={16} />
-                    <strong>Smart Deduction Algorithm / බර අඩු කිරීමේ ක්‍රමය</strong>
-                  </div>
-                  <p>Weight loss is distributed based on water scores. Score 0 (dry) gets <strong>no deduction</strong>.
-                    Higher scores get proportionally more deduction.</p>
-                  <p style={{ marginTop: '4px' }}>
-                    ජල ලකුණු මත බර අඩු කිරීම බෙදා හරිනු ලැබේ. ලකුණු 0 (වියළි) සඳහා <strong>අඩු කිරීමක් නැත</strong>.
-                  </p>
+              {/* Explanation */}
+              <div style={{
+                background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px',
+                padding: '14px 18px', marginBottom: '20px', fontSize: '13px', color: '#92400e',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <AlertTriangle size={16} />
+                  <strong>How it works / ක්‍රියා කරන ආකාරය</strong>
                 </div>
-              )}
+                <p>Net kilos for each customer = Gross kilos − Water deduction (entered by rider).
+                  The lorry scale weight is compared with the cumulative gross total to find any difference.
+                  This difference is saved for reports only — customer payments are based on their net kilos.</p>
+                <p style={{ marginTop: '4px' }}>
+                  සෑම ගනුදෙනුකරුවෙකුටම ශුද්ධ කිලෝ = මුළු බර − ජල අඩු කිරීම (රියදුරු විසින් ඇතුළත් කළ).
+                  ලොරි කිරුම බර සමස්ත මුළු බර සමඟ සංසන්දනය කරනු ලැබේ.
+                </p>
+              </div>
 
               {/* Validate Button */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button
                   className="btn btn-primary btn-lg"
                   onClick={handleValidate}
-                  disabled={submitting || !warehouseKilos || parseFloat(warehouseKilos) <= 0}
+                  disabled={submitting || !lorryScaleKilos || parseFloat(lorryScaleKilos) <= 0}
                   style={{ minWidth: '200px' }}
                 >
                   {submitting
                     ? <><Loader2 size={20} className="spin" /> Processing...</>
-                    : <><CheckCircle size={20} /> Validate & Apply</>
+                    : <><CheckCircle size={20} /> Validate & Save</>
                   }
                 </button>
               </div>
@@ -350,9 +325,11 @@ export default function ValidationPage() {
             Validation Complete! / තහවුරු කිරීම සම්පූර්ණයි!
           </h3>
           <p style={{ color: 'var(--gray-500)', marginTop: '8px' }}>
-            {result.deductions?.length} collections validated.
-            Driver: {result.totalDriverKilos} kg → Warehouse: {result.totalWarehouseKilos} kg
-            (Loss: {result.totalLoss} kg)
+            {result.customerSummary?.length} collections recorded.
+            Gross: {result.totalGrossKilos} kg →
+            Net: {result.totalNetKilos} kg →
+            Lorry Scale: {result.lorryScaleKilos} kg
+            (Difference: {result.lorryCumulativeDiff > 0 ? '+' : ''}{result.lorryCumulativeDiff} kg)
           </p>
         </div>
       )}

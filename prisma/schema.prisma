@@ -114,8 +114,9 @@ model TeaCollection {
   driverId       Int?     @map("driver_id")
   lorryId        Int?     @map("lorry_id")
   kilosByDriver  Float    @map("kilos_by_driver")
+  waterDeduction Float    @default(0) @map("water_deduction") // manual kg deduction by rider
   kilosValidated Float?   @map("kilos_validated")
-  waterScore     Int      @default(0) @map("water_score") // 0=dry, 1=slight, 2=moderate, 3=very wet
+  waterScore     Int      @default(0) @map("water_score") // DEPRECATED - kept for old data
   collectionDate DateTime @map("collection_date")
   month          Int
   year           Int
@@ -132,9 +133,12 @@ model LorryValidation {
   id                  Int      @id @default(autoincrement())
   lorryId             Int      @map("lorry_id")
   validationDate      DateTime @map("validation_date")
-  totalDriverKilos    Float    @map("total_driver_kilos")
-  totalWarehouseKilos Float    @map("total_warehouse_kilos")
-  weightLoss          Float    @map("weight_loss")
+  totalGrossKilos     Float    @default(0) @map("total_gross_kilos")      // sum of kilosByDriver (before deduction)
+  totalDriverKilos    Float    @map("total_driver_kilos")                 // sum of net kilos (after deduction)
+  lorryScaleKilos     Float    @default(0) @map("lorry_scale_kilos")      // actual lorry scale reading
+  totalWarehouseKilos Float    @map("total_warehouse_kilos")              // kept for compat
+  lorryCumulativeDiff Float    @default(0) @map("lorry_cumulative_diff")  // lorryScale - cumulativeNet
+  weightLoss          Float    @map("weight_loss")                        // kept for compat
   collectionsCount    Int      @map("collections_count")
   createdAt           DateTime @default(now()) @map("created_at")
 

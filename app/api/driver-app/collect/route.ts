@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 // POST: Record a tea collection
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { driverId, lorryId, customerId, kilosByDriver, waterScore } = body;
+  const { driverId, lorryId, customerId, kilosByDriver, waterDeduction } = body;
 
   if (!driverId || !customerId || !kilosByDriver) {
     return NextResponse.json({ error: 'driverId, customerId, and kilosByDriver are required' }, { status: 400 });
@@ -47,6 +47,13 @@ export async function POST(req: NextRequest) {
   if (isNaN(kilos) || kilos <= 0) {
     return NextResponse.json({ error: 'Invalid kilos value' }, { status: 400 });
   }
+
+  const deduction = parseFloat(waterDeduction) || 0;
+  if (deduction < 0 || deduction >= kilos) {
+    return NextResponse.json({ error: 'Water deduction must be >= 0 and less than kilos / ජල අඩු කිරීම 0 ට වැඩි සහ කිලෝ වලට වඩා අඩු විය යුතුය' }, { status: 400 });
+  }
+
+  const netKilos = Math.round((kilos - deduction) * 100) / 100;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -60,14 +67,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Please start your operation first / කරුණාකර පළමුව මෙහෙයුම ආරම්භ කරන්න' }, { status: 400 });
   }
 
-  // Create tea collection
+  // Create tea collection with kilosValidated calculated immediately
   const collection = await prisma.teaCollection.create({
     data: {
       customerId,
       driverId,
       lorryId: lorryId || null,
       kilosByDriver: kilos,
-      waterScore: parseInt(waterScore) || 0,
+      waterDeduction: deduction,
+      kilosValidated: netKilos,
       collectionDate: today,
       month: today.getMonth() + 1,
       year: today.getFullYear(),
@@ -75,16 +83,16 @@ export async function POST(req: NextRequest) {
     include: { customer: true },
   });
 
-  // Update session counters
+  // Update session counters (use net kilos after deduction)
   await prisma.driverSession.update({
     where: { id: session.id },
     data: {
       collectionsCount: { increment: 1 },
-      totalKilos: { increment: kilos },
+      totalKilos: { increment: netKilos },
     },
   });
 
-  console.log(`[COLLECT] Driver ${driverId} collected ${kilos}kg from customer ${customerId}`);
+  console.log(`[COLLECT] Driver ${driverId} collected ${kilos}kg (deduction: ${deduction}kg, net: ${netKilos}kg) from customer ${customerId}`);
 
   return NextResponse.json({ collection }, { status: 201 });
 }

@@ -12,11 +12,15 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { customerId, driverId, lorryId, kilosByDriver, waterScore, collectionDate } = body;
+  const { customerId, driverId, lorryId, kilosByDriver, waterDeduction, collectionDate } = body;
 
   if (!customerId || !kilosByDriver || !collectionDate) {
     return NextResponse.json({ error: 'Customer, kilos, and date are required' }, { status: 400 });
   }
+
+  const kilos = parseFloat(kilosByDriver);
+  const deduction = parseFloat(waterDeduction) || 0;
+  const netKilos = Math.round((kilos - deduction) * 100) / 100;
 
   const date = new Date(collectionDate);
   const collection = await prisma.teaCollection.create({
@@ -24,8 +28,9 @@ export async function POST(req: NextRequest) {
       customerId,
       driverId: driverId || null,
       lorryId: lorryId || null,
-      kilosByDriver: parseFloat(kilosByDriver),
-      waterScore: parseInt(waterScore) || 0,
+      kilosByDriver: kilos,
+      waterDeduction: deduction,
+      kilosValidated: netKilos,
       collectionDate: date,
       month: date.getMonth() + 1,
       year: date.getFullYear(),

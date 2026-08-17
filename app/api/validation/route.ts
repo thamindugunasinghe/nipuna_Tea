@@ -28,10 +28,12 @@ export async function GET(req: NextRequest) {
     orderBy: { id: 'asc' },
   });
 
-  const totalDriverKilos = collections.reduce((sum, c) => sum + c.kilosByDriver, 0);
-  const allValidated = collections.length > 0 && collections.every(c => c.kilosValidated != null);
+  // Calculate totals
+  const totalGrossKilos = collections.reduce((sum, c) => sum + c.kilosByDriver, 0);
+  const totalWaterDeduction = collections.reduce((sum, c) => sum + (c.waterDeduction || 0), 0);
+  const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
 
-  // Check if a validation record already exists (warehouse uses lorryId=0 convention in validation table)
+  // Check if a validation record already exists
   let existingValidation = null;
   if (!isWarehouse) {
     existingValidation = await prisma.lorryValidation.findUnique({
@@ -41,21 +43,22 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     collections,
-    totalDriverKilos,
+    totalGrossKilos,
+    totalWaterDeduction,
+    totalNetKilos,
     collectionsCount: collections.length,
-    allValidated,
     existingValidation,
     isWarehouse,
   });
 }
 
-// POST: Perform smart validation — distribute weight loss based on water scores
+// POST: Record lorry validation — compare cumulative net kilos vs lorry scale reading
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { lorryId, date, warehouseKilos, warehouse } = body;
+  const { lorryId, date, lorryScaleKilos, warehouse } = body;
 
-  if ((!lorryId && !warehouse) || !date || warehouseKilos === undefined) {
-    return NextResponse.json({ error: 'lorryId (or warehouse), date, and warehouseKilos are required' }, { status: 400 });
+  if ((!lorryId && !warehouse) || !date || lorryScaleKilos === undefined) {
+    return NextResponse.json({ error: 'lorryId (or warehouse), date, and lorryScaleKilos are required' }, { status: 400 });
   }
 
   const isWarehouse = warehouse === true;
@@ -78,82 +81,68 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No collections found for this lorry/warehouse and date' }, { status: 400 });
   }
 
-  const totalDriverKilos = collections.reduce((sum, c) => sum + c.kilosByDriver, 0);
-  const actualWarehouseKilos = parseFloat(warehouseKilos);
-  const totalLoss = Math.max(0, totalDriverKilos - actualWarehouseKilos);
+  // Calculate totals
+  const totalGrossKilos = collections.reduce((sum, c) => sum + c.kilosByDriver, 0);
+  const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
+  const actualLorryScaleKilos = parseFloat(lorryScaleKilos);
 
-  // === SMART WATER-WEIGHT DEDUCTION ALGORITHM ===
-  // Calculate weighted scores: kilos × waterScore
-  const weightedScores = collections.map(c => ({
-    id: c.id,
-    kilos: c.kilosByDriver,
-    waterScore: c.waterScore,
-    weightedScore: c.kilosByDriver * c.waterScore,
-  }));
+  // The key difference: lorry scale vs cumulative gross kilos
+  const lorryCumulativeDiff = Math.round((actualLorryScaleKilos - totalGrossKilos) * 100) / 100;
 
-  const totalWeightedScore = weightedScores.reduce((sum, w) => sum + w.weightedScore, 0);
-
-  // Calculate deductions
-  const deductions = weightedScores.map(w => {
-    let deduction: number;
-
-    if (totalLoss === 0) {
-      // No loss — no deduction for anyone
-      deduction = 0;
-    } else if (totalWeightedScore > 0) {
-      // Normal case: distribute loss proportionally based on weighted scores
-      // Score 0 customers → weightedScore = 0 → deduction = 0 ✅
-      deduction = (w.weightedScore / totalWeightedScore) * totalLoss;
-    } else {
-      // Fallback: ALL customers have score 0 but loss exists
-      // Distribute proportionally by weight
-      deduction = (w.kilos / totalDriverKilos) * totalLoss;
+  // Ensure all collections have kilosValidated set (for old data that might not have it)
+  for (const c of collections) {
+    if (c.kilosValidated == null) {
+      const netKilos = Math.round((c.kilosByDriver - (c.waterDeduction || 0)) * 100) / 100;
+      await prisma.teaCollection.update({
+        where: { id: c.id },
+        data: { kilosValidated: netKilos },
+      });
     }
-
-    return {
-      id: w.id,
-      kilos: w.kilos,
-      waterScore: w.waterScore,
-      deduction: Math.round(deduction * 100) / 100, // round to 2 decimals
-      validatedKilos: Math.round((w.kilos - deduction) * 100) / 100,
-    };
-  });
-
-  // Update each collection with validated kilos
-  for (const d of deductions) {
-    await prisma.teaCollection.update({
-      where: { id: d.id },
-      data: { kilosValidated: d.validatedKilos },
-    });
   }
 
-  // Create/update validation record (skip for warehouse — warehouse collections validated directly)
+  // Create/update validation record (skip for warehouse)
   let validation = null;
   if (!isWarehouse) {
     validation = await prisma.lorryValidation.upsert({
       where: { lorryId_validationDate: { lorryId: parseInt(lorryId), validationDate: dateStart } },
       update: {
-        totalDriverKilos,
-        totalWarehouseKilos: actualWarehouseKilos,
-        weightLoss: totalLoss,
+        totalGrossKilos,
+        totalDriverKilos: totalNetKilos,
+        lorryScaleKilos: actualLorryScaleKilos,
+        totalWarehouseKilos: actualLorryScaleKilos,
+        lorryCumulativeDiff,
+        weightLoss: Math.abs(lorryCumulativeDiff),
         collectionsCount: collections.length,
       },
       create: {
         lorryId: parseInt(lorryId),
         validationDate: dateStart,
-        totalDriverKilos,
-        totalWarehouseKilos: actualWarehouseKilos,
-        weightLoss: totalLoss,
+        totalGrossKilos,
+        totalDriverKilos: totalNetKilos,
+        lorryScaleKilos: actualLorryScaleKilos,
+        totalWarehouseKilos: actualLorryScaleKilos,
+        lorryCumulativeDiff,
+        weightLoss: Math.abs(lorryCumulativeDiff),
         collectionsCount: collections.length,
       },
     });
   }
 
+  // Build per-customer summary for response
+  const customerSummary = collections.map(c => ({
+    id: c.id,
+    customerName: c.customer?.name,
+    grossKilos: c.kilosByDriver,
+    waterDeduction: c.waterDeduction || 0,
+    netKilos: c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0)),
+  }));
+
   return NextResponse.json({
     validation,
-    deductions,
-    totalDriverKilos,
-    totalWarehouseKilos: actualWarehouseKilos,
-    totalLoss,
+    customerSummary,
+    totalGrossKilos,
+    totalNetKilos,
+    lorryScaleKilos: actualLorryScaleKilos,
+    lorryCumulativeDiff,
   });
 }

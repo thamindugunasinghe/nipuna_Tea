@@ -6,9 +6,6 @@ import { Plus, Leaf, CheckCircle, Droplets } from 'lucide-react';
 import Modal from '@/components/Modal';
 import Toast, { useToast } from '@/components/Toast';
 
-const waterLabels = ['Dry / වියළි', 'Slight / සුළු', 'Moderate / මධ්‍යම', 'Very Wet / ඉතා තෙත්'];
-const waterColors = ['badge-green', 'badge-blue', 'badge-amber', 'badge-red'];
-
 export default function CollectionsPage() {
   const { t } = useTranslation();
   const { toast, showToast, hideToast } = useToast();
@@ -20,7 +17,7 @@ export default function CollectionsPage() {
   const [showModal, setShowModal] = useState(false);
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [form, setForm] = useState({
-    customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterScore: '0',
+    customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0',
     collectionDate: new Date().toISOString().split('T')[0],
   });
 
@@ -48,7 +45,7 @@ export default function CollectionsPage() {
           driverId: form.driverId ? parseInt(form.driverId) : null,
           lorryId: form.lorryId ? parseInt(form.lorryId) : null,
           kilosByDriver: parseFloat(form.kilosByDriver),
-          waterScore: parseInt(form.waterScore),
+          waterDeduction: parseFloat(form.waterDeduction) || 0,
           collectionDate: form.collectionDate,
         }),
       });
@@ -57,7 +54,7 @@ export default function CollectionsPage() {
         setShowModal(false);
         const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
-        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterScore: '0', collectionDate: new Date().toISOString().split('T')[0] });
+        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0', collectionDate: new Date().toISOString().split('T')[0] });
       } else {
         const data = await res.json();
         showToast(data.error || t('common.error'), 'error');
@@ -106,34 +103,42 @@ export default function CollectionsPage() {
               <th>{t('collections.driver')}</th>
               <th>{t('collections.lorry')}</th>
               <th>{t('collections.kilosByDriver')}</th>
-              <th>Water / ජලය</th>
-              <th>{t('collections.kilosValidated')}</th>
+              <th>Water Deduction / ජල අඩු කිරීම</th>
+              <th>Net Kilos / ශුද්ධ බර</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
-            ) : filtered.map((c, i) => (
-              <tr key={c.id}>
-                <td>{i + 1}</td>
-                <td style={{ fontWeight: 600 }}>{c.customer?.name}</td>
-                <td>{c.driver?.name || '-'}</td>
-                <td>{c.lorry?.lorryNumber || '-'}</td>
-                <td>{c.kilosByDriver} {t('common.kg')}</td>
-                <td>
-                  <span className={`badge ${waterColors[c.waterScore || 0]}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Droplets size={12} />
-                    {c.waterScore || 0} — {waterLabels[c.waterScore || 0]}
-                  </span>
-                </td>
-                <td>
-                  {c.kilosValidated != null
-                    ? <span className="badge badge-green"><CheckCircle size={14} style={{ marginRight: 4 }} />{c.kilosValidated} {t('common.kg')}</span>
-                    : <span className="badge badge-amber">{t('collections.notValidated')}</span>
-                  }
-                </td>
-              </tr>
-            ))}
+            ) : filtered.map((c, i) => {
+              const deduction = c.waterDeduction || 0;
+              const netKilos = c.kilosValidated ?? (c.kilosByDriver - deduction);
+              return (
+                <tr key={c.id}>
+                  <td>{i + 1}</td>
+                  <td style={{ fontWeight: 600 }}>{c.customer?.name}</td>
+                  <td>{c.driver?.name || '-'}</td>
+                  <td>{c.lorry?.lorryNumber || '-'}</td>
+                  <td>{c.kilosByDriver} {t('common.kg')}</td>
+                  <td>
+                    {deduction > 0 ? (
+                      <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Droplets size={12} />
+                        - {deduction} {t('common.kg')}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--gray-400)' }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className="badge badge-green">
+                      <CheckCircle size={14} style={{ marginRight: 4 }} />
+                      {netKilos} {t('common.kg')}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -175,15 +180,23 @@ export default function CollectionsPage() {
               value={form.kilosByDriver} onChange={(e) => setForm({ ...form, kilosByDriver: e.target.value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">Water Score / ජල ලකුණු *</label>
-            <select className="form-select" value={form.waterScore} onChange={(e) => setForm({ ...form, waterScore: e.target.value })}>
-              <option value="0">0 — Dry / වියළි 🍂</option>
-              <option value="1">1 — Slight / සුළු 💧</option>
-              <option value="2">2 — Moderate / මධ්‍යම 💧💧</option>
-              <option value="3">3 — Very Wet / ඉතා තෙත් 💧💧💧</option>
-            </select>
+            <label className="form-label">Water Deduction (kg) / ජල අඩු කිරීම</label>
+            <input type="number" step="0.1" min="0" className="form-input" placeholder="0"
+              value={form.waterDeduction} onChange={(e) => setForm({ ...form, waterDeduction: e.target.value })} />
           </div>
         </div>
+        {/* Net Kilos Preview */}
+        {form.kilosByDriver && (
+          <div style={{
+            background: 'var(--primary-50)', borderRadius: '8px', padding: '12px 16px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px',
+          }}>
+            <span style={{ fontSize: '13px', color: 'var(--gray-600)' }}>Net Kilos / ශුද්ධ බර:</span>
+            <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary-700)' }}>
+              {Math.max(0, (parseFloat(form.kilosByDriver) || 0) - (parseFloat(form.waterDeduction) || 0)).toFixed(1)} kg
+            </span>
+          </div>
+        )}
       </Modal>
     </div>
   );
