@@ -132,7 +132,7 @@ model TeaCollection {
 
 model LorryValidation {
   id                  Int      @id @default(autoincrement())
-  lorryId             Int      @map("lorry_id")
+  lorryId             Int?     @map("lorry_id")
   validationDate      DateTime @map("validation_date")
   totalGrossKilos     Float    @default(0) @map("total_gross_kilos")      // sum of kilosByDriver (before deduction)
   totalDriverKilos    Float    @map("total_driver_kilos")                 // sum of net kilos (after deduction)
@@ -143,7 +143,7 @@ model LorryValidation {
   collectionsCount    Int      @map("collections_count")
   createdAt           DateTime @default(now()) @map("created_at")
 
-  lorry Lorry @relation(fields: [lorryId], references: [id])
+  lorry Lorry? @relation(fields: [lorryId], references: [id])
 
   @@unique([lorryId, validationDate])
   @@map("lorry_validations")

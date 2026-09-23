@@ -34,12 +34,9 @@ export async function GET(req: NextRequest) {
   const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
 
   // Check if a validation record already exists
-  let existingValidation = null;
-  if (!isWarehouse) {
-    existingValidation = await prisma.lorryValidation.findUnique({
-      where: { lorryId_validationDate: { lorryId, validationDate: dateStart } },
-    });
-  }
+  const existingValidation = await prisma.lorryValidation.findUnique({
+    where: { lorryId_validationDate: { lorryId: isWarehouse ? null : lorryId, validationDate: dateStart } },
+  });
 
   // Check if there are collections added after validation (would need re-validation)
   const hasUnvalidatedCollections = existingValidation
@@ -106,33 +103,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Create/update validation record (skip for warehouse)
-  let validation = null;
-  if (!isWarehouse) {
-    validation = await prisma.lorryValidation.upsert({
-      where: { lorryId_validationDate: { lorryId: parseInt(lorryId), validationDate: dateStart } },
-      update: {
-        totalGrossKilos,
-        totalDriverKilos: totalNetKilos,
-        lorryScaleKilos: actualLorryScaleKilos,
-        totalWarehouseKilos: actualLorryScaleKilos,
-        lorryCumulativeDiff,
-        weightLoss: Math.abs(lorryCumulativeDiff),
-        collectionsCount: collections.length,
-      },
-      create: {
-        lorryId: parseInt(lorryId),
-        validationDate: dateStart,
-        totalGrossKilos,
-        totalDriverKilos: totalNetKilos,
-        lorryScaleKilos: actualLorryScaleKilos,
-        totalWarehouseKilos: actualLorryScaleKilos,
-        lorryCumulativeDiff,
-        weightLoss: Math.abs(lorryCumulativeDiff),
-        collectionsCount: collections.length,
-      },
-    });
-  }
+  // Create/update validation record (now also works for warehouse)
+  const lorryIdValue = isWarehouse ? null : parseInt(lorryId);
+  const validation = await prisma.lorryValidation.upsert({
+    where: { lorryId_validationDate: { lorryId: lorryIdValue, validationDate: dateStart } },
+    update: {
+      totalGrossKilos,
+      totalDriverKilos: totalNetKilos,
+      lorryScaleKilos: actualLorryScaleKilos,
+      totalWarehouseKilos: actualLorryScaleKilos,
+      lorryCumulativeDiff,
+      weightLoss: Math.abs(lorryCumulativeDiff),
+      collectionsCount: collections.length,
+    },
+    create: {
+      lorryId: lorryIdValue,
+      validationDate: dateStart,
+      totalGrossKilos,
+      totalDriverKilos: totalNetKilos,
+      lorryScaleKilos: actualLorryScaleKilos,
+      totalWarehouseKilos: actualLorryScaleKilos,
+      lorryCumulativeDiff,
+      weightLoss: Math.abs(lorryCumulativeDiff),
+      collectionsCount: collections.length,
+    },
+  });
 
   // Build per-customer summary for response
   const customerSummary = collections.map(c => ({
