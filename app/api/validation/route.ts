@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
   const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
 
   // Check if a validation record already exists
-  const existingValidation = await prisma.lorryValidation.findUnique({
-    where: { lorryId_validationDate: { lorryId: isWarehouse ? null : lorryId, validationDate: dateStart } },
+  const existingValidation = await prisma.lorryValidation.findFirst({
+    where: { lorryId: isWarehouse ? null : lorryId, validationDate: dateStart },
   });
 
   // Check if there are collections added after validation (would need re-validation)
@@ -105,29 +105,35 @@ export async function POST(req: NextRequest) {
 
   // Create/update validation record (now also works for warehouse)
   const lorryIdValue = isWarehouse ? null : parseInt(lorryId);
-  const validation = await prisma.lorryValidation.upsert({
-    where: { lorryId_validationDate: { lorryId: lorryIdValue, validationDate: dateStart } },
-    update: {
-      totalGrossKilos,
-      totalDriverKilos: totalNetKilos,
-      lorryScaleKilos: actualLorryScaleKilos,
-      totalWarehouseKilos: actualLorryScaleKilos,
-      lorryCumulativeDiff,
-      weightLoss: Math.abs(lorryCumulativeDiff),
-      collectionsCount: collections.length,
-    },
-    create: {
-      lorryId: lorryIdValue,
-      validationDate: dateStart,
-      totalGrossKilos,
-      totalDriverKilos: totalNetKilos,
-      lorryScaleKilos: actualLorryScaleKilos,
-      totalWarehouseKilos: actualLorryScaleKilos,
-      lorryCumulativeDiff,
-      weightLoss: Math.abs(lorryCumulativeDiff),
-      collectionsCount: collections.length,
-    },
+  const existing = await prisma.lorryValidation.findFirst({
+    where: { lorryId: lorryIdValue, validationDate: dateStart },
   });
+
+  const validationData = {
+    totalGrossKilos,
+    totalDriverKilos: totalNetKilos,
+    lorryScaleKilos: actualLorryScaleKilos,
+    totalWarehouseKilos: actualLorryScaleKilos,
+    lorryCumulativeDiff,
+    weightLoss: Math.abs(lorryCumulativeDiff),
+    collectionsCount: collections.length,
+  };
+
+  let validation;
+  if (existing) {
+    validation = await prisma.lorryValidation.update({
+      where: { id: existing.id },
+      data: validationData,
+    });
+  } else {
+    validation = await prisma.lorryValidation.create({
+      data: {
+        lorryId: lorryIdValue,
+        validationDate: dateStart,
+        ...validationData,
+      },
+    });
+  }
 
   // Build per-customer summary for response
   const customerSummary = collections.map(c => ({
