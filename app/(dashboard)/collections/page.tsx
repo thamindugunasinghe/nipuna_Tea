@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { Plus, Leaf, CheckCircle, Droplets } from 'lucide-react';
+import { Plus, Leaf, CheckCircle, Droplets, Truck, Warehouse } from 'lucide-react';
 import Modal from '@/components/Modal';
 import Toast, { useToast } from '@/components/Toast';
+import CustomerSearch from '@/components/CustomerSearch';
 
 export default function CollectionsPage() {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ export default function CollectionsPage() {
   const [form, setForm] = useState({
     customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0',
     collectionDate: new Date().toISOString().split('T')[0],
+    collectionType: 'lorry' as 'lorry' | 'warehouse',
   });
 
   useEffect(() => {
@@ -42,8 +44,8 @@ export default function CollectionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerId: parseInt(form.customerId),
-          driverId: form.driverId ? parseInt(form.driverId) : null,
-          lorryId: form.lorryId ? parseInt(form.lorryId) : null,
+          driverId: form.collectionType === 'warehouse' ? null : (form.driverId ? parseInt(form.driverId) : null),
+          lorryId: form.collectionType === 'warehouse' ? null : (form.lorryId ? parseInt(form.lorryId) : null),
           kilosByDriver: parseFloat(form.kilosByDriver),
           waterDeduction: parseFloat(form.waterDeduction) || 0,
           collectionDate: form.collectionDate,
@@ -54,7 +56,7 @@ export default function CollectionsPage() {
         setShowModal(false);
         const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
-        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0', collectionDate: new Date().toISOString().split('T')[0] });
+        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0', collectionDate: new Date().toISOString().split('T')[0], collectionType: 'lorry' });
       } else {
         const data = await res.json();
         showToast(data.error || t('common.error'), 'error');
@@ -116,9 +118,14 @@ export default function CollectionsPage() {
               return (
                 <tr key={c.id}>
                   <td>{i + 1}</td>
-                  <td style={{ fontWeight: 600 }}>{c.customer?.name}</td>
-                  <td>{c.driver?.name || '-'}</td>
-                  <td>{c.lorry?.lorryNumber || '-'}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {c.customer?.customerId && (
+                      <span className="badge badge-blue" style={{ fontFamily: 'monospace', fontSize: '11px', marginRight: '6px' }}>{c.customer.customerId}</span>
+                    )}
+                    {c.customer?.name}
+                  </td>
+                  <td>{c.driver?.name || (!c.driverId && !c.lorryId ? <span className="badge badge-purple" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Warehouse size={12} />{t('collections.warehouse')}</span> : '—')}</td>
+                  <td>{c.lorry?.lorryNumber || (!c.driverId && !c.lorryId ? <span className="badge badge-purple" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Warehouse size={12} />{t('collections.warehouse')}</span> : '—')}</td>
                   <td>{c.kilosByDriver} {t('common.kg')}</td>
                   <td>
                     {deduction > 0 ? (
@@ -151,12 +158,37 @@ export default function CollectionsPage() {
           <input type="date" className="form-input" value={form.collectionDate} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
         </div>
         <div className="form-group">
-          <label className="form-label">{t('collections.customer')} *</label>
-          <select className="form-select" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
-            <option value="">{t('collections.selectCustomer')}</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <label className="form-label">{t('collections.collectionType')} *</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className={`btn ${form.collectionType === 'lorry' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              onClick={() => setForm({ ...form, collectionType: 'lorry', driverId: '', lorryId: '' })}
+            >
+              <Truck size={18} /> {t('collections.lorryCollection')}
+            </button>
+            <button
+              type="button"
+              className={`btn ${form.collectionType === 'warehouse' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              onClick={() => setForm({ ...form, collectionType: 'warehouse', driverId: '', lorryId: '' })}
+            >
+              <Warehouse size={18} /> {t('collections.warehouseCollection')}
+            </button>
+          </div>
         </div>
+        <div className="form-group">
+          <CustomerSearch
+            customers={customers}
+            selectedId={form.customerId}
+            onSelect={(id) => setForm({ ...form, customerId: id })}
+            label={t('collections.customer')}
+            required
+            placeholder="Search by name or ID..."
+          />
+        </div>
+        {form.collectionType === 'lorry' && (
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">{t('collections.driver')}</label>
@@ -173,9 +205,10 @@ export default function CollectionsPage() {
             </select>
           </div>
         </div>
+        )}
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">{t('collections.kilosByDriver')} *</label>
+            <label className="form-label">{form.collectionType === 'warehouse' ? `${t('collections.kilos')} *` : `${t('collections.kilosByDriver')} *`}</label>
             <input type="number" step="0.1" className="form-input" placeholder={t('collections.enterKilos')}
               value={form.kilosByDriver} onChange={(e) => setForm({ ...form, kilosByDriver: e.target.value })} />
           </div>
@@ -201,3 +234,4 @@ export default function CollectionsPage() {
     </div>
   );
 }
+

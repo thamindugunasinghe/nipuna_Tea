@@ -10,10 +10,22 @@ interface CustomerSummary {
   customerId: number;
   customerName: string;
   customerPhone: string | null;
+  customerId_display: string;
   totalKilos: number;
   totalPendingCredit: number;
   pendingCreditCount: number;
   payment: any;
+}
+
+// Helper to get first and last day of current month
+function getMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().split('T')[0],
+    endDate: end.toISOString().split('T')[0],
+  };
 }
 
 export default function PaymentsPage() {
@@ -21,18 +33,19 @@ export default function PaymentsPage() {
   const { toast, showToast, hideToast } = useToast();
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const defaultRange = getMonthRange();
+  const [startDate, setStartDate] = useState(defaultRange.startDate);
+  const [endDate, setEndDate] = useState(defaultRange.endDate);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
 
   useEffect(() => {
     fetchCustomers();
-  }, [month, year]);
+  }, [startDate, endDate]);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/payments?month=${month}&year=${year}`);
+      const res = await fetch(`/api/payments?startDate=${startDate}&endDate=${endDate}`);
       if (res.ok) setCustomers(await res.json());
     } catch (e) {
       console.error(e);
@@ -40,10 +53,9 @@ export default function PaymentsPage() {
     setLoading(false);
   };
 
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
+  // Derive month/year from start date for the PaymentPopup
+  const paymentMonth = new Date(startDate).getMonth() + 1;
+  const paymentYear = new Date(startDate).getFullYear();
 
   const totalKilos = customers.reduce((s, c) => s + c.totalKilos, 0);
   const totalCredit = customers.reduce((s, c) => s + c.totalPendingCredit, 0);
@@ -57,21 +69,27 @@ export default function PaymentsPage() {
         <h1>{t('payments.title')}</h1>
       </div>
 
-      {/* Month/Year Selector */}
+      {/* Date Range Selector */}
       <div className="card" style={{ marginBottom: '24px' }}>
         <div className="card-body">
           <div className="form-row" style={{ alignItems: 'flex-end' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{t('payments.selectMonth')}</label>
-              <select className="form-select" value={month} onChange={(e) => setMonth(parseInt(e.target.value))}>
-                {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
+              <label className="form-label">Start Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{t('payments.selectYear')}</label>
-              <select className="form-select" value={year} onChange={(e) => setYear(parseInt(e.target.value))}>
-                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
+              <label className="form-label">End Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -127,7 +145,7 @@ export default function PaymentsPage() {
                   <td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}>
                     {t('common.noData')}
                     <p style={{ color: 'var(--gray-400)', fontSize: '13px', marginTop: '8px' }}>
-                      No customers with tea collections or credit purchases for this month.
+                      No customers with tea collections or credit purchases for this period.
                     </p>
                   </td>
                 </tr>
@@ -138,7 +156,12 @@ export default function PaymentsPage() {
                   onClick={() => setSelectedCustomer(c)}
                 >
                   <td>{i + 1}</td>
-                  <td style={{ fontWeight: 600 }}>{c.customerName}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {c.customerId_display && (
+                      <span className="badge badge-blue" style={{ fontFamily: 'monospace', fontSize: '11px', marginRight: '6px' }}>{c.customerId_display}</span>
+                    )}
+                    {c.customerName}
+                  </td>
                   <td>
                     <span style={{ fontWeight: 600 }}>{c.totalKilos.toLocaleString()}</span>{' '}
                     <span style={{ color: 'var(--gray-400)', fontSize: '12px' }}>kg</span>
@@ -192,8 +215,8 @@ export default function PaymentsPage() {
         <PaymentPopup
           customerId={selectedCustomer.customerId}
           customerName={selectedCustomer.customerName}
-          month={month}
-          year={year}
+          month={paymentMonth}
+          year={paymentYear}
           onClose={() => setSelectedCustomer(null)}
           onPaymentComplete={() => {
             showToast('Payment completed successfully! / ගෙවීම සාර්ථකයි!', 'success');
@@ -204,3 +227,4 @@ export default function PaymentsPage() {
     </div>
   );
 }
+

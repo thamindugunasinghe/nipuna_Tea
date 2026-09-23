@@ -6,23 +6,39 @@ import { Calculator, CheckCircle, Printer } from 'lucide-react';
 import Toast, { useToast } from '@/components/Toast';
 import { printReceipt } from '@/lib/printReceipt';
 
+// Helper to get first and last day of current month
+function getMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: start.toISOString().split('T')[0],
+    endDate: end.toISOString().split('T')[0],
+  };
+}
+
 export default function CommissionsPage() {
   const { t } = useTranslation();
   const { toast, showToast, hideToast } = useToast();
   const [commissions, setCommissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const defaultRange = getMonthRange();
+  const [startDate, setStartDate] = useState(defaultRange.startDate);
+  const [endDate, setEndDate] = useState(defaultRange.endDate);
   const [pricePerKilo, setPricePerKilo] = useState('');
   const [commissionRate, setCommissionRate] = useState('5');
 
-  useEffect(() => { fetchCommissions(); }, [month, year]);
+  // Derive month/year from start date for API calls
+  const month = new Date(startDate).getMonth() + 1;
+  const year = new Date(startDate).getFullYear();
+
+  useEffect(() => { fetchCommissions(); }, [startDate, endDate]);
 
   const fetchCommissions = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/commissions?month=${month}&year=${year}`);
+      const res = await fetch(`/api/commissions?startDate=${startDate}&endDate=${endDate}`);
       if (res.ok) setCommissions(await res.json());
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -77,16 +93,12 @@ export default function CommissionsPage() {
         <div className="card-body">
           <div className="form-row" style={{ alignItems: 'flex-end' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{t('payments.selectMonth')}</label>
-              <select className="form-select" value={month} onChange={(e) => setMonth(parseInt(e.target.value))}>
-                {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-              </select>
+              <label className="form-label">Start Date</label>
+              <input type="date" className="form-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{t('payments.selectYear')}</label>
-              <select className="form-select" value={year} onChange={(e) => setYear(parseInt(e.target.value))}>
-                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
+              <label className="form-label">End Date</label>
+              <input type="date" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">{t('payments.pricePerKilo')}</label>
@@ -159,3 +171,4 @@ export default function CommissionsPage() {
     </div>
   );
 }
+

@@ -9,6 +9,7 @@ import Link from 'next/link';
 
 interface Customer {
   id: number;
+  customerId: string;
   name: string;
   nic: string | null;
   phone: string | null;
@@ -83,7 +84,9 @@ export default function CustomersPage() {
   };
 
   const filtered = customers.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
+    const q = search.toLowerCase();
+    const matchSearch = c.name.toLowerCase().includes(q) ||
+      (c.customerId && c.customerId.toLowerCase().includes(q)) ||
       (c.nic && c.nic.includes(search));
     const matchType = typeFilter === 'all' || c.type === typeFilter;
     return matchSearch && matchType;
@@ -125,6 +128,7 @@ export default function CustomersPage() {
           <thead>
             <tr>
               <th>#</th>
+              <th>Customer ID</th>
               <th>{t('customers.name')}</th>
               <th>{t('customers.nic')}</th>
               <th>{t('customers.phone')}</th>
@@ -135,10 +139,11 @@ export default function CustomersPage() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
             ) : filtered.map((c, i) => (
               <tr key={c.id}>
                 <td>{i + 1}</td>
+                <td><span className="badge badge-blue" style={{ fontFamily: 'monospace', fontWeight: 600 }}>{c.customerId}</span></td>
                 <td style={{ fontWeight: 600 }}>{c.name}</td>
                 <td>{c.nic || '-'}</td>
                 <td>{c.phone || '-'}</td>
@@ -182,6 +187,12 @@ export default function CustomersPage() {
           </>
         }
       >
+        {editCustomer && (
+          <div className="form-group">
+            <label className="form-label">Customer ID</label>
+            <input className="form-input" value={editCustomer.customerId} disabled style={{ background: 'var(--gray-100)', fontFamily: 'monospace', fontWeight: 600 }} />
+          </div>
+        )}
         <div className="form-group">
           <label className="form-label">{t('customers.name')} *</label>
           <input className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -211,3 +222,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+

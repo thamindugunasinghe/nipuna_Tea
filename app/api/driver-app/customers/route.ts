@@ -8,6 +8,7 @@ export async function GET() {
     orderBy: { name: 'asc' },
     select: {
       id: true,
+      customerId: true,
       name: true,
       phone: true,
       type: true,

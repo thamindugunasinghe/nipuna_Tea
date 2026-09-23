@@ -94,7 +94,7 @@
     "nonRegular": "අනිත්‍ය පාරිභෝගිකයා",
     "creditBalance": "ණය ශේෂය",
     "totalTeaKilos": "මුළු තේ (කි.ග්‍රෑ.)",
-    "searchByName": "නම හෝ හැඳුනුම්පතෙන් සොයන්න...",
+    "searchByName": "නම, ID, හෝ හැඳුනුම්පතෙන් සොයන්න...",
     "registerSuccess": "පාරිභෝගිකයා සාර්ථකව ලියාපදිංචි විය",
     "updateSuccess": "පාරිභෝගිකයා සාර්ථකව යාවත්කාලීන විය",
     "deleteConfirm": "මෙම පාරිභෝගිකයා මකන්නද?",
@@ -121,7 +121,12 @@
     "selectCustomer": "පාරිභෝගිකයා තෝරන්න",
     "enterKilos": "කිලෝ ඇතුළත් කරන්න",
     "validationSuccess": "කිලෝ සාර්ථකව තහවුරු විය",
-    "addSuccess": "එකතු කිරීම සාර්ථකව ඇතුළත් විය"
+    "addSuccess": "එකතු කිරීම සාර්ථකව ඇතුළත් විය",
+    "collectionType": "එකතු කිරීමේ වර්ගය",
+    "lorryCollection": "ලොරි එකතුව",
+    "warehouseCollection": "ගබඩා එකතුව",
+    "warehouse": "ගබඩාව",
+    "kilos": "කිලෝ"
   },
   "purchases": {
     "title": "ණය මිලදී ගැනීම්",
@@ -137,7 +142,13 @@
     "selectFertiliser": "පොහොර තෝරන්න",
     "selectCustomer": "පාරිභෝගිකයා තෝරන්න",
     "currentLiability": "වත්මන් වගකීම",
-    "addSuccess": "මිලදී ගැනීම සාර්ථකව වාර්තා විය"
+    "addSuccess": "මිලදී ගැනීම සාර්ථකව වාර්තා විය",
+    "cashAdvance": "මුදල් අත්තිකාරම",
+    "creditPurchase": "ණය මිලදී ගැනීම",
+    "addItem": "අයිතමය එකතු කරන්න",
+    "addedItems": "එකතු කළ අයිතම",
+    "grandTotal": "මුළු එකතුව",
+    "removeItem": "ඉවත් කරන්න"
   },
   "fleet": {
     "title": "ලොරි සහ රියදුරන්",

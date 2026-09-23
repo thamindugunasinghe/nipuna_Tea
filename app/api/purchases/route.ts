@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendCreditPurchaseSms, sendCashAdvanceSms } from '@/lib/sms';
 
 export async function GET() {
   const purchases = await prisma.creditPurchase.findMany({
@@ -19,6 +20,8 @@ export async function POST(req: NextRequest) {
   }
 
   const date = new Date(purchaseDate || new Date());
+  const computedTotal = totalCost || (quantity || 1) * parseFloat(unitPrice);
+
   const purchase = await prisma.creditPurchase.create({
     data: {
       customerId,
@@ -27,11 +30,36 @@ export async function POST(req: NextRequest) {
       description: description || null,
       quantity: quantity || 1,
       unitPrice: parseFloat(unitPrice),
-      totalCost: totalCost || (quantity || 1) * parseFloat(unitPrice),
+      totalCost: computedTotal,
       purchaseDate: date,
       month: date.getMonth() + 1,
       year: date.getFullYear(),
     },
+    include: { customer: true },
   });
+
+  // Send SMS notification (async, non-blocking)
+  if (purchase.customer?.phone) {
+    const dateStr = date.toISOString().split('T')[0];
+    if (itemType === 'cash_advance') {
+      sendCashAdvanceSms(
+        purchase.customer.name,
+        purchase.customer.phone,
+        computedTotal,
+        dateStr
+      ).catch(err => console.error('[SMS] Cash advance SMS error:', err));
+    } else {
+      sendCreditPurchaseSms(
+        purchase.customer.name,
+        purchase.customer.phone,
+        itemType,
+        description || '',
+        computedTotal,
+        dateStr
+      ).catch(err => console.error('[SMS] Credit purchase SMS error:', err));
+    }
+  }
+
   return NextResponse.json(purchase, { status: 201 });
 }
+

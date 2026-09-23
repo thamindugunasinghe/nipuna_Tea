@@ -692,6 +692,11 @@ html, body {
   color: var(--gray-600);
 }
 
+.badge-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
 /* ==================== MODAL ==================== */
 .modal-overlay {
   position: fixed;
@@ -1129,3 +1134,137 @@ html, body {
 .amount-negative {
   color: var(--error);
 }
+
+/* Customer Search Component */
+.customer-search-wrapper {
+  position: relative;
+}
+
+.customer-search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.customer-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--gray-400);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.customer-search-input {
+  padding-left: 36px !important;
+}
+
+.customer-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius-sm);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 4px;
+  list-style: none;
+  padding: 4px;
+}
+
+.customer-search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background var(--transition-fast);
+}
+
+.customer-search-item:hover,
+.customer-search-item.highlighted {
+  background: var(--primary-50);
+}
+
+.customer-search-item-id {
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--info);
+  background: rgba(37, 99, 235, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.customer-search-item-name {
+  font-weight: 500;
+  color: var(--gray-800);
+  font-size: 14px;
+}
+
+.customer-search-empty,
+.customer-search-hint {
+  padding: 12px;
+  text-align: center;
+  color: var(--gray-400);
+  font-size: 13px;
+}
+
+.customer-search-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--primary-50);
+  border: 2px solid var(--primary-200);
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.customer-search-selected-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--primary-700);
+}
+
+.customer-search-selected-id {
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--info);
+  background: rgba(37, 99, 235, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.customer-search-selected-name {
+  font-weight: 600;
+  color: var(--gray-800);
+  font-size: 14px;
+}
+
+.customer-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--gray-200);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--gray-600);
+  transition: all var(--transition-fast);
+}
+
+.customer-search-clear:hover {
+  background: var(--error);
+  color: var(--white);
+}
+

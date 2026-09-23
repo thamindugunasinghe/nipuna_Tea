@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendCollectionSms } from '@/lib/sms';
 
 // GET: Get collections by driver for today
 export async function GET(req: NextRequest) {
@@ -93,6 +94,19 @@ export async function POST(req: NextRequest) {
   });
 
   console.log(`[COLLECT] Driver ${driverId} collected ${kilos}kg (deduction: ${deduction}kg, net: ${netKilos}kg) from customer ${customerId}`);
+
+  // Send SMS notification (async, non-blocking)
+  if (collection.customer?.phone) {
+    const today = new Date();
+    sendCollectionSms(
+      collection.customer.name,
+      collection.customer.phone,
+      kilos,
+      deduction,
+      netKilos,
+      today.toISOString().split('T')[0]
+    ).catch(err => console.error('[SMS] Driver collection SMS error:', err));
+  }
 
   return NextResponse.json({ collection }, { status: 201 });
 }

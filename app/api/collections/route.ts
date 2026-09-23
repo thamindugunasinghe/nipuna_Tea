@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendCollectionSms } from '@/lib/sms';
 
 export async function GET() {
   const collections = await prisma.teaCollection.findMany({
@@ -35,6 +36,20 @@ export async function POST(req: NextRequest) {
       month: date.getMonth() + 1,
       year: date.getFullYear(),
     },
+    include: { customer: true },
   });
+
+  // Send SMS notification (async, non-blocking)
+  if (collection.customer?.phone) {
+    sendCollectionSms(
+      collection.customer.name,
+      collection.customer.phone,
+      kilos,
+      deduction,
+      netKilos,
+      date.toISOString().split('T')[0]
+    ).catch(err => console.error('[SMS] Collection SMS error:', err));
+  }
+
   return NextResponse.json(collection, { status: 201 });
 }

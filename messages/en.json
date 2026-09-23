@@ -94,7 +94,7 @@
     "nonRegular": "Non-Regular Customer",
     "creditBalance": "Credit Balance",
     "totalTeaKilos": "Total Tea (kg)",
-    "searchByName": "Search by name or NIC...",
+    "searchByName": "Search by name, ID, or NIC...",
     "registerSuccess": "Customer registered successfully",
     "updateSuccess": "Customer updated successfully",
     "deleteConfirm": "Delete this customer?",
@@ -121,7 +121,12 @@
     "selectCustomer": "Select Customer",
     "enterKilos": "Enter kilos",
     "validationSuccess": "Kilos validated successfully",
-    "addSuccess": "Collection entry added"
+    "addSuccess": "Collection entry added",
+    "collectionType": "Collection Type",
+    "lorryCollection": "Lorry Collection",
+    "warehouseCollection": "Warehouse Collection",
+    "warehouse": "Warehouse",
+    "kilos": "Kilos"
   },
   "purchases": {
     "title": "Credit Purchases",
@@ -137,7 +142,13 @@
     "selectFertiliser": "Select Fertiliser",
     "selectCustomer": "Select Customer",
     "currentLiability": "Current Liability",
-    "addSuccess": "Purchase recorded successfully"
+    "addSuccess": "Purchase recorded successfully",
+    "cashAdvance": "Cash Advance",
+    "creditPurchase": "Credit Purchase",
+    "addItem": "Add Item",
+    "addedItems": "Added Items",
+    "grandTotal": "Grand Total",
+    "removeItem": "Remove"
   },
   "fleet": {
     "title": "Lorries & Drivers",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendMonthlyPaymentSms } from '@/lib/sms';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
   const creditIds: number[] = settledCreditIds || [];
   let groceryDeduction = 0;
   let fertiliserDeduction = 0;
+  let cashAdvanceDeduction = 0;
 
   if (creditIds.length > 0) {
     const selectedCredits = await prisma.creditPurchase.findMany({
@@ -46,12 +48,16 @@ export async function POST(req: NextRequest) {
     fertiliserDeduction = selectedCredits
       .filter(c => c.itemType === 'fertiliser')
       .reduce((sum, c) => sum + c.totalCost, 0);
+
+    cashAdvanceDeduction = selectedCredits
+      .filter(c => c.itemType === 'cash_advance')
+      .reduce((sum, c) => sum + c.totalCost, 0);
   }
 
   // Calculate payment
   const grossPayment = totalKilos * pricePerKilo;
   const otherDeductionAmt = grossPayment * (otherDeductionPct / 100);
-  const netPayment = Math.max(0, grossPayment - groceryDeduction - fertiliserDeduction - otherDeductionAmt);
+  const netPayment = Math.max(0, grossPayment - groceryDeduction - fertiliserDeduction - cashAdvanceDeduction - otherDeductionAmt);
 
   // Upsert payment record
   const payment = await prisma.monthlyPayment.upsert({
@@ -111,6 +117,27 @@ export async function POST(req: NextRequest) {
     include: { driver: true },
     orderBy: { collectionDate: 'asc' },
   });
+
+  // Send SMS notification to customer (async, non-blocking)
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  if (payment.customer?.phone) {
+    sendMonthlyPaymentSms(
+      payment.customer.name,
+      payment.customer.phone,
+      monthNames[month - 1],
+      year,
+      totalKilos,
+      pricePerKilo,
+      grossPayment,
+      groceryDeduction,
+      fertiliserDeduction,
+      otherDeductionAmt,
+      netPayment
+    ).catch(err => console.error('[SMS] Monthly payment SMS error:', err));
+  }
 
   return NextResponse.json({
     payment,
