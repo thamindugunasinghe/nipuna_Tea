@@ -45,6 +45,9 @@ export default function PurchasesPage() {
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
+  // Only regular customers can make credit purchases
+  const regularCustomers = customers.filter((c: any) => c.type === 'regular');
+
   const totalCost = form.itemType === 'grocery'
     ? parseFloat(form.unitPrice || '0')
     : parseFloat(form.quantity || '0') * parseFloat(form.unitPrice || '0');
@@ -241,7 +244,7 @@ export default function PurchasesPage() {
           <button className="btn btn-primary" onClick={handleAdd}>{t('common.save')}</button></>}>
         <div className="form-group">
           <CustomerSearch
-            customers={customers}
+            customers={regularCustomers}
             selectedId={form.customerId}
             onSelect={(id) => setForm({ ...form, customerId: id })}
             label={t('purchases.selectCustomer')}

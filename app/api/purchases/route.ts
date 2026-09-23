@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
   }
 
+  // Only regular customers can make credit purchases
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  if (customer?.type === 'non-regular') {
+    return NextResponse.json({ error: 'Non-regular customers cannot make credit purchases' }, { status: 400 });
+  }
+
   const date = new Date(purchaseDate || new Date());
   const computedTotal = totalCost || (quantity || 1) * parseFloat(unitPrice);
 

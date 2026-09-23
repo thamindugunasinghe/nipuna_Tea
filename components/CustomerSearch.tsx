@@ -175,6 +175,9 @@ export default function CustomerSearch({
               >
                 <span className="customer-search-item-id">{c.customerId}</span>
                 <span className="customer-search-item-name">{c.name}</span>
+                {c.type === 'non-regular' && (
+                  <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', background: '#fef3c7', color: '#92400e', marginLeft: 'auto', flexShrink: 0 }}>Non-Regular</span>
+                )}
               </li>
             ))
           )}
