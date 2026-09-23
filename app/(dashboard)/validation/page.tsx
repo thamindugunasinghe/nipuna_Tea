@@ -104,7 +104,7 @@ export default function ValidationPage() {
 
   // Calculate preview
   const parsedLorryScale = parseFloat(lorryScaleKilos || '0');
-  const previewDiff = data ? Math.round((parsedLorryScale - data.totalGrossKilos) * 100) / 100 : 0;
+  const previewDiff = data ? Math.round((parsedLorryScale - data.totalNetKilos) * 100) / 100 : 0;
 
   // Check if already validated (has existingValidation and no new unvalidated collections)
   const isAlreadyValidated = data?.existingValidation && !data?.hasUnvalidatedCollections;
@@ -349,8 +349,8 @@ export default function ValidationPage() {
                             {previewDiff > 0 ? '+' : ''}{previewDiff} kg
                           </div>
                           <div className="stat-sub">
-                            {previewDiff > 0 ? 'Lorry shows more than collected gross / ලොරිය එකතු කළ මුළු බරට වඩා වැඩිය' :
-                             previewDiff < 0 ? 'Lorry shows less than collected gross / ලොරිය එකතු කළ මුළු බරට වඩා අඩුය' :
+                            {previewDiff > 0 ? 'Lorry shows more than net total / ලොරිය ශුද්ධ බරට වඩා වැඩිය' :
+                             previewDiff < 0 ? 'Lorry shows less than net total / ලොරිය ශුද්ධ බරට වඩා අඩුය' :
                              'No difference / වෙනසක් නැත'}
                           </div>
                         </div>

@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
   const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
   const actualLorryScaleKilos = parseFloat(lorryScaleKilos);
 
-  // The key difference: lorry scale vs cumulative gross kilos
-  const lorryCumulativeDiff = Math.round((actualLorryScaleKilos - totalGrossKilos) * 100) / 100;
+  // The key difference: lorry scale vs cumulative net kilos (after water deduction)
+  const lorryCumulativeDiff = Math.round((actualLorryScaleKilos - totalNetKilos) * 100) / 100;
 
   // Ensure all collections have kilosValidated set (for old data that might not have it)
   for (const c of collections) {

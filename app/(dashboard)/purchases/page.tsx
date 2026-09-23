@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { Plus, ShoppingCart, Printer, X, PlusCircle } from 'lucide-react';
+import { Plus, ShoppingCart, Printer, X, PlusCircle, Search } from 'lucide-react';
 import Modal from '@/components/Modal';
 import Toast, { useToast } from '@/components/Toast';
 import { printReceipt } from '@/lib/printReceipt';
@@ -23,6 +23,7 @@ export default function PurchasesPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [fertilisers, setFertilisers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     customerId: '', itemType: 'grocery', fertiliserId: '', description: '',
@@ -182,6 +183,16 @@ export default function PurchasesPage() {
 
   if (loading) return <div className="loading-overlay"><div className="spinner" /></div>;
 
+  const filteredPurchases = search.trim()
+    ? purchases.filter(p => {
+        const q = search.toLowerCase();
+        const cName = p.customer?.name?.toLowerCase() || '';
+        const cId = p.customer?.customerId?.toLowerCase() || '';
+        const type = getItemTypeLabel(p.itemType).toLowerCase();
+        return cName.includes(q) || cId.includes(q) || type.includes(q);
+      })
+    : purchases;
+
   return (
     <div>
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
@@ -191,6 +202,20 @@ export default function PurchasesPage() {
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={18} /> {t('purchases.addPurchase')}
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div style={{ marginBottom: '16px' }}>
+        <div className="search-bar">
+          <Search />
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Search purchases by customer or item type..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="table-wrapper">
@@ -210,9 +235,9 @@ export default function PurchasesPage() {
             </tr>
           </thead>
           <tbody>
-            {purchases.length === 0 ? (
+            {filteredPurchases.length === 0 ? (
               <tr><td colSpan={10} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
-            ) : purchases.map((p, i) => (
+            ) : filteredPurchases.map((p, i) => (
               <tr key={p.id}>
                 <td>{i + 1}</td>
                 <td>{new Date(p.purchaseDate).toLocaleDateString()}</td>
