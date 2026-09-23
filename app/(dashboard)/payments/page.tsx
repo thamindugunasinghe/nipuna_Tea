@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { DollarSign, CheckCircle, Clock, Leaf, ShoppingCart } from 'lucide-react';
+import { DollarSign, CheckCircle, Clock, Leaf, ShoppingCart, Search } from 'lucide-react';
 import Toast, { useToast } from '@/components/Toast';
 import PaymentPopup from '@/components/PaymentPopup';
 
@@ -37,6 +37,7 @@ export default function PaymentsPage() {
   const [startDate, setStartDate] = useState(defaultRange.startDate);
   const [endDate, setEndDate] = useState(defaultRange.endDate);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerSummary | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchCustomers();
@@ -60,6 +61,15 @@ export default function PaymentsPage() {
   const totalKilos = customers.reduce((s, c) => s + c.totalKilos, 0);
   const totalCredit = customers.reduce((s, c) => s + c.totalPendingCredit, 0);
   const paidCount = customers.filter(c => c.payment?.paid).length;
+
+  // Filter customers by search
+  const filtered = search.trim()
+    ? customers.filter(c => {
+        const q = search.toLowerCase();
+        return c.customerName.toLowerCase().includes(q) ||
+               (c.customerId_display && c.customerId_display.toLowerCase().includes(q));
+      })
+    : customers;
 
   return (
     <div>
@@ -121,6 +131,20 @@ export default function PaymentsPage() {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div style={{ marginBottom: '16px' }}>
+        <div className="search-bar">
+          <Search />
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Search customer by name or ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
       {/* Customer List */}
       {loading ? (
         <div className="loading-overlay"><div className="spinner" /></div>
@@ -149,7 +173,7 @@ export default function PaymentsPage() {
                     </p>
                   </td>
                 </tr>
-              ) : customers.map((c, i) => (
+              ) : filtered.map((c, i) => (
                 <tr
                   key={c.customerId}
                   style={{ cursor: 'pointer' }}

@@ -41,6 +41,11 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Check if there are collections added after validation (would need re-validation)
+  const hasUnvalidatedCollections = existingValidation
+    ? collections.some(c => new Date(c.createdAt) > new Date(existingValidation!.createdAt))
+    : collections.length > 0;
+
   return NextResponse.json({
     collections,
     totalGrossKilos,
@@ -48,6 +53,7 @@ export async function GET(req: NextRequest) {
     totalNetKilos,
     collectionsCount: collections.length,
     existingValidation,
+    hasUnvalidatedCollections,
     isWarehouse,
   });
 }
