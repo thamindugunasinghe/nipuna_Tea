@@ -1,7 +1,7 @@
 'use client';
 
 interface ReceiptData {
-  type: 'payment' | 'commission' | 'credit';
+  type: 'payment' | 'commission' | 'credit' | 'instant-cash';
   // Common
   receiptNo?: string;
   date: string;
@@ -236,6 +236,45 @@ export function printReceipt(data: ReceiptData) {
       <div class="credit-note">
         This amount will be deducted from the monthly tea payment.<br/>
         මෙම මුදල මාසික තේ ගෙවීමෙන් අඩු කරනු ලැබේ.
+      </div>
+    `;
+  } else if (data.type === 'instant-cash') {
+    bodyContent = `
+      <div class="receipt-type">Instant Cash Payment</div>
+      <div class="receipt-type-si">ක්ෂණික මුදල් ගෙවීම</div>
+      
+      <div class="info-row">
+        <span class="label">Customer / තේ වෙළෙන්දා:</span>
+        <span class="value">${data.customerName}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Date / දිනය:</span>
+        <span class="value">${data.date}</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <table>
+        <tr>
+          <td class="label-cell">Total Tea (Net) / ශුද්ධ බර</td>
+          <td class="value-cell">${data.totalKilos?.toLocaleString()} kg</td>
+        </tr>
+        <tr>
+          <td class="label-cell">Price per Kilo / කිලෝ මිල</td>
+          <td class="value-cell">Rs. ${data.pricePerKilo?.toLocaleString()}</td>
+        </tr>
+      </table>
+
+      <div class="divider thick"></div>
+
+      <div class="total-row">
+        <span>Amount Paid / ගෙවූ මුදල</span>
+        <span class="total-amount">Rs. ${data.netPayment?.toLocaleString()}</span>
+      </div>
+
+      <div class="credit-note">
+        Instant cash payment for non-regular collection.<br/>
+        ක්ෂණික මුදල් ගෙවීමකි.
       </div>
     `;
   }

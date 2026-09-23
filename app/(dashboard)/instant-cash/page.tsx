@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Banknote, CheckCircle, Search, History, Printer, Loader2 } from 'lucide-react';
 import Toast, { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
+import { printReceipt } from '@/lib/printReceipt';
 
 export default function InstantCashPage() {
   const { toast, showToast, hideToast } = useToast();
@@ -71,6 +72,18 @@ export default function InstantCashPage() {
     setShowModal(true);
   };
 
+  const handlePrint = (collection: any, price: string) => {
+    printReceipt({
+      type: 'instant-cash',
+      receiptNo: `CASH-${collection.id}`,
+      date: new Date(collection.collectionDate).toLocaleDateString(),
+      customerName: collection.customer?.name,
+      totalKilos: collection.netKilos,
+      pricePerKilo: parseFloat(price || '0'),
+      netPayment: collection.netKilos * (parseFloat(price || '0')),
+    });
+  };
+
   const handleProcessPayment = async () => {
     if (!selectedCollection || !pricePerKilo || parseFloat(pricePerKilo) <= 0) {
       showToast('Please enter a valid price per kilo', 'warning');
@@ -88,6 +101,7 @@ export default function InstantCashPage() {
       if (res.ok) {
         showToast('Payment processed successfully!', 'success');
         setShowModal(false);
+        handlePrint(selectedCollection, pricePerKilo);
         fetchCollections();
       } else {
         const err = await res.json();
@@ -200,10 +214,15 @@ export default function InstantCashPage() {
                       <Banknote size={14} /> Pay Cash
                     </button>
                   ) : (
-                    <span style={{ color: 'var(--gray-400)', fontSize: '12px' }}>
-                      <CheckCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                      Completed
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--gray-400)', fontSize: '12px' }}>
+                        <CheckCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                        Completed
+                      </span>
+                      <button className="btn btn-secondary btn-sm" onClick={() => handlePrint(c, pricePerKilo || '0')}>
+                        <Printer size={14} />
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>
