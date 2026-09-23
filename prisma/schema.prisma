@@ -117,6 +117,8 @@ model TeaCollection {
   kilosByDriver  Float    @map("kilos_by_driver")
   waterDeduction Float    @default(0) @map("water_deduction") // manual kg deduction by rider
   kilosValidated Float?   @map("kilos_validated")
+  instantPaid    Boolean  @default(false) @map("instant_paid")
+  instantPaidAt  DateTime? @map("instant_paid_at")
   waterScore     Int      @default(0) @map("water_score") // DEPRECATED - kept for old data
   collectionDate DateTime @map("collection_date")
   month          Int

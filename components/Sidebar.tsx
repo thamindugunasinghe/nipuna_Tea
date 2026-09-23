@@ -18,6 +18,7 @@ import {
   LogOut,
   UserCog,
   Wifi,
+  Banknote,
 } from 'lucide-react';
 
 const navItems = [
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/customers', icon: Users, labelKey: 'nav.customers' },
   { href: '/collections', icon: Leaf, labelKey: 'nav.collections' },
   { href: '/validation', icon: Scale, labelKey: 'nav.validation' },
+  { href: '/instant-cash', icon: Banknote, labelKey: 'nav.instantCash' },
   { href: '/online-drivers', icon: Wifi, labelKey: 'nav.onlineDrivers' },
   { href: '/purchases', icon: ShoppingCart, labelKey: 'nav.purchases' },
   { href: '/fleet', icon: Truck, labelKey: 'nav.fleet' },
