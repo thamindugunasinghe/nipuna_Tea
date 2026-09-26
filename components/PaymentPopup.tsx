@@ -9,6 +9,8 @@ interface PaymentPopupProps {
   customerName: string;
   month: number;
   year: number;
+  startDate: string;
+  endDate: string;
   onClose: () => void;
   onPaymentComplete: () => void;
 }
@@ -19,7 +21,7 @@ const monthNames = [
 ];
 
 export default function PaymentPopup({
-  customerId, customerName, month, year, onClose, onPaymentComplete,
+  customerId, customerName, month, year, startDate, endDate, onClose, onPaymentComplete,
 }: PaymentPopupProps) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -36,7 +38,7 @@ export default function PaymentPopup({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/payments/customer-detail?customerId=${customerId}&month=${month}&year=${year}`
+        `/api/payments/customer-detail?customerId=${customerId}&month=${month}&year=${year}&startDate=${startDate}&endDate=${endDate}`
       );
       if (res.ok) {
         const d = await res.json();
@@ -103,6 +105,8 @@ export default function PaymentPopup({
           customerId,
           month,
           year,
+          startDate,
+          endDate,
           pricePerKilo: price,
           settledCreditIds: selectedCreditIds,
         }),

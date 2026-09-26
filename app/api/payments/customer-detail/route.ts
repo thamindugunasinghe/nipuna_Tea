@@ -6,6 +6,8 @@ export async function GET(req: NextRequest) {
   const customerId = parseInt(searchParams.get('customerId') || '0');
   const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1));
   const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()));
+  const startDate = searchParams.get('startDate');
+  const endDate = searchParams.get('endDate');
 
   if (!customerId) {
     return NextResponse.json({ error: 'customerId is required' }, { status: 400 });
@@ -16,55 +18,67 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
   }
 
-  // Get all tea collections for the month (validated only count towards payment)
-  const collections = await prisma.teaCollection.findMany({
-    where: { customerId, month, year },
-    include: { driver: true, lorry: true },
-    orderBy: { collectionDate: 'asc' },
-  });
+  // Run queries in parallel to drastically improve performance
+  const [
+    collections,
+    pendingCredits,
+    settings,
+    existingPayment
+  ] = await Promise.all([
+    // 1. Get all tea collections for the date range
+    prisma.teaCollection.findMany({
+      where: { 
+        customerId, 
+        collectionDate: { 
+          gte: startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(year, month - 1, 1), 
+          lte: endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(year, month, 0, 23, 59, 59, 999) 
+        } 
+      },
+      include: { driver: true, lorry: true },
+      orderBy: { collectionDate: 'asc' },
+    }),
+    // 2. Get ALL pending credit purchases
+    prisma.creditPurchase.findMany({
+      where: {
+        customerId,
+        settled: false,
+        purchaseDate: {
+          lte: endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(year, month, 0, 23, 59, 59, 999)
+        },
+      },
+      include: { fertiliser: true },
+      orderBy: { purchaseDate: 'asc' },
+    }),
+    // 3. Batch fetch settings
+    prisma.settings.findMany({
+      where: { key: { in: ['tea_price_per_kilo', 'transport_cost_per_kilo', 'stamp_cost_per_kilo', 'other_deduction_pct'] } }
+    }),
+    // 4. Existing payment for this month
+    prisma.monthlyPayment.findUnique({
+      where: { customerId_month_year: { customerId, month, year } },
+    })
+  ]);
 
-  // Get ALL pending credit purchases (from any month up to current)
-  const pendingCredits = await prisma.creditPurchase.findMany({
-    where: {
-      customerId,
-      settled: false,
-      OR: [
-        { year: { lt: year } },
-        { year, month: { lte: month } },
-      ],
-    },
-    include: { fertiliser: true },
-    orderBy: { purchaseDate: 'asc' },
-  });
+  const getSetting = (key: string, def: number) => {
+    const s = settings.find(x => x.key === key);
+    return s ? parseFloat(s.value) : def;
+  };
 
-  // Get default price from settings
-  const priceSetting = await prisma.settings.findUnique({ where: { key: 'tea_price_per_kilo' } });
-  const defaultPricePerKilo = priceSetting ? parseFloat(priceSetting.value) : 0;
-
-  // Get transport & stamp cost settings
-  const transportSetting = await prisma.settings.findUnique({ where: { key: 'transport_cost_per_kilo' } });
-  const stampSetting = await prisma.settings.findUnique({ where: { key: 'stamp_cost_per_kilo' } });
-  const otherDeductionSetting = await prisma.settings.findUnique({ where: { key: 'other_deduction_pct' } });
-  const transportCostPerKilo = transportSetting ? parseFloat(transportSetting.value) : 6;
-  const stampCostPerKilo = stampSetting ? parseFloat(stampSetting.value) : 0;
-  const otherDeductionPct = otherDeductionSetting ? parseFloat(otherDeductionSetting.value) : 5;
+  const defaultPricePerKilo = getSetting('tea_price_per_kilo', 0);
+  const transportCostPerKilo = getSetting('transport_cost_per_kilo', 6);
+  const stampCostPerKilo = getSetting('stamp_cost_per_kilo', 0);
+  const otherDeductionPct = getSetting('other_deduction_pct', 5);
 
   // Calculate totals
   const totalValidatedKilos = collections
     .filter(c => c.kilosValidated != null)
     .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
 
-  // Lorry kilos (for transport cost — only collections with lorryId)
   const lorryKilos = collections
     .filter(c => c.kilosValidated != null && c.lorryId !== null)
     .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
 
   const totalPendingCredit = pendingCredits.reduce((sum, p) => sum + p.totalCost, 0);
-
-  // Existing payment for this month
-  const existingPayment = await prisma.monthlyPayment.findUnique({
-    where: { customerId_month_year: { customerId, month, year } },
-  });
 
   return NextResponse.json({
     customer,

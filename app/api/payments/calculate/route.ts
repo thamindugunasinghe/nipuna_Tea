@@ -4,7 +4,7 @@ import { sendMonthlyPaymentSms } from '@/lib/sms';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { customerId, month, year, pricePerKilo, settledCreditIds } = body;
+  const { customerId, month, year, startDate, endDate, pricePerKilo, settledCreditIds } = body;
 
   if (!customerId || !month || !year || !pricePerKilo) {
     return NextResponse.json(
@@ -13,18 +13,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Get cost settings
-  const transportSetting = await prisma.settings.findUnique({ where: { key: 'transport_cost_per_kilo' } });
-  const stampSetting = await prisma.settings.findUnique({ where: { key: 'stamp_cost_per_kilo' } });
-  const otherDeductionSetting = await prisma.settings.findUnique({ where: { key: 'other_deduction_pct' } });
+  // Get cost settings (Batched query)
+  const settings = await prisma.settings.findMany({
+    where: { key: { in: ['transport_cost_per_kilo', 'stamp_cost_per_kilo', 'other_deduction_pct'] } }
+  });
   
-  const transportCostPerKilo = transportSetting ? parseFloat(transportSetting.value) : 6;
-  const stampCostPerKilo = stampSetting ? parseFloat(stampSetting.value) : 0;
-  const otherDeductionPct = otherDeductionSetting ? parseFloat(otherDeductionSetting.value) : 5;
+  const getSetting = (key: string, def: number) => {
+    const s = settings.find(x => x.key === key);
+    return s ? parseFloat(s.value) : def;
+  };
+  
+  const transportCostPerKilo = getSetting('transport_cost_per_kilo', 6);
+  const stampCostPerKilo = getSetting('stamp_cost_per_kilo', 0);
+  const otherDeductionPct = getSetting('other_deduction_pct', 5);
 
-  // Total validated tea kilos for the month
+  // Fetch validated collections and include driver for response
   const collections = await prisma.teaCollection.findMany({
-    where: { customerId, month, year, kilosValidated: { not: null } },
+    where: { 
+      customerId, 
+      collectionDate: { 
+        gte: startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(year, month - 1, 1), 
+        lte: endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(year, month, 0, 23, 59, 59, 999) 
+      },
+      kilosValidated: { not: null } 
+    },
+    include: { driver: true },
+    orderBy: { collectionDate: 'asc' },
   });
   const totalKilos = collections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
 
@@ -49,10 +63,13 @@ export async function POST(req: NextRequest) {
   let groceryDeduction = 0;
   let fertiliserDeduction = 0;
   let cashAdvanceDeduction = 0;
+  let selectedCredits: any[] = [];
 
   if (creditIds.length > 0) {
-    const selectedCredits = await prisma.creditPurchase.findMany({
+    selectedCredits = await prisma.creditPurchase.findMany({
       where: { id: { in: creditIds }, customerId, settled: false },
+      include: { fertiliser: true },
+      orderBy: { purchaseDate: 'asc' },
     });
 
     groceryDeduction = selectedCredits
@@ -126,21 +143,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Fetch the settled credits for the response (for bill generation)
-  const settledCredits = creditIds.length > 0
-    ? await prisma.creditPurchase.findMany({
-        where: { id: { in: creditIds } },
-        include: { fertiliser: true },
-        orderBy: { purchaseDate: 'asc' },
-      })
-    : [];
 
-  // Fetch collections for the response
-  const paymentCollections = await prisma.teaCollection.findMany({
-    where: { customerId, month, year, kilosValidated: { not: null } },
-    include: { driver: true },
-    orderBy: { collectionDate: 'asc' },
-  });
 
   // Send SMS notification to customer (async, non-blocking)
   const monthNames = [
@@ -165,7 +168,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     payment,
-    collections: paymentCollections,
-    settledCredits,
+    collections,
+    settledCredits: selectedCredits,
   });
 }

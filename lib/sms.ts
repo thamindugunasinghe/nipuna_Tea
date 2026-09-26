@@ -44,6 +44,7 @@ export async function sendSms(phone: string, message: string): Promise<boolean> 
         type: 'plain',
         message,
       }),
+      signal: AbortSignal.timeout(3000), // Prevent hanging
     });
 
     const responseBody = await response.text();

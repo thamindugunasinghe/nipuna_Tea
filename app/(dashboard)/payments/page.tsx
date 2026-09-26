@@ -54,9 +54,9 @@ export default function PaymentsPage() {
     setLoading(false);
   };
 
-  // Derive month/year from start date for the PaymentPopup
-  const paymentMonth = new Date(startDate).getMonth() + 1;
-  const paymentYear = new Date(startDate).getFullYear();
+  // Derive month/year from end date for the MonthlyPayment record
+  const paymentMonth = new Date(endDate).getMonth() + 1;
+  const paymentYear = new Date(endDate).getFullYear();
 
   const totalKilos = customers.reduce((s, c) => s + c.totalKilos, 0);
   const totalCredit = customers.reduce((s, c) => s + c.totalPendingCredit, 0);
@@ -241,6 +241,8 @@ export default function PaymentsPage() {
           customerName={selectedCustomer.customerName}
           month={paymentMonth}
           year={paymentYear}
+          startDate={startDate}
+          endDate={endDate}
           onClose={() => setSelectedCustomer(null)}
           onPaymentComplete={() => {
             showToast('Payment completed successfully! / ගෙවීම සාර්ථකයි!', 'success');
