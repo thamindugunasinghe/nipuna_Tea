@@ -83,13 +83,14 @@ export default function PaymentPopup({
     .reduce((sum: number, c: any) => sum + c.totalCost, 0);
   const totalDeductions = groceryDeduction + fertiliserDeduction;
 
-  // Transport cost: only for lorry collections
   const transportCostPerKilo = data?.transportCostPerKilo || 0;
   const stampCostPerKilo = data?.stampCostPerKilo || 0;
+  const otherDeductionPct = data?.otherDeductionPct || 5;
   const lorryKilos = data?.lorryKilos || 0;
   const transportCostTotal = Math.round(lorryKilos * transportCostPerKilo * 100) / 100;
   const stampCostTotal = Math.round(totalKilos * stampCostPerKilo * 100) / 100;
-  const netPayment = Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal);
+  const otherDeductionAmt = Math.round(grossPayment * (otherDeductionPct / 100) * 100) / 100;
+  const netPayment = Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal - otherDeductionAmt);
 
   const handlePay = async () => {
     if (!price || price <= 0) return;
@@ -132,6 +133,7 @@ export default function PaymentPopup({
       fertiliserDeduction: p.fertiliserDeduction,
       transportDeduction: transportCostTotal,
       stampDeduction: stampCostTotal,
+      otherDeduction: otherDeductionAmt,
       transportCostPerKilo: transportCostPerKilo,
       stampCostPerKilo: stampCostPerKilo,
       netPayment: p.netPayment,
@@ -412,6 +414,12 @@ export default function PaymentPopup({
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#dc2626' }}>Stamp ({stampCostPerKilo}/kg) / මුද්දර</span>
                       <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {stampCostTotal.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {otherDeductionAmt > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#dc2626' }}>Other Deduction ({otherDeductionPct}%) / වෙනත්</span>
+                      <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {otherDeductionAmt.toLocaleString()}</span>
                     </div>
                   )}
 

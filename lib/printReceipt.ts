@@ -149,6 +149,11 @@ export function printReceipt(data: ReceiptData) {
           <td class="label-cell">Stamp (${data.stampCostPerKilo}/kg) / මුද්දර</td>
           <td class="value-cell deduct">- Rs. ${data.stampDeduction?.toLocaleString()}</td>
         </tr>` : ''}
+        ${data.otherDeduction ? `
+        <tr>
+          <td class="label-cell">Other Deduction (5%) / වෙනත්</td>
+          <td class="value-cell deduct">- Rs. ${data.otherDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
       </table>
 
       <div class="divider thick"></div>

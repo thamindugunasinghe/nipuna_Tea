@@ -44,8 +44,10 @@ export async function GET(req: NextRequest) {
   // Get transport & stamp cost settings
   const transportSetting = await prisma.settings.findUnique({ where: { key: 'transport_cost_per_kilo' } });
   const stampSetting = await prisma.settings.findUnique({ where: { key: 'stamp_cost_per_kilo' } });
+  const otherDeductionSetting = await prisma.settings.findUnique({ where: { key: 'other_deduction_pct' } });
   const transportCostPerKilo = transportSetting ? parseFloat(transportSetting.value) : 6;
   const stampCostPerKilo = stampSetting ? parseFloat(stampSetting.value) : 0;
+  const otherDeductionPct = otherDeductionSetting ? parseFloat(otherDeductionSetting.value) : 5;
 
   // Calculate totals
   const totalValidatedKilos = collections
@@ -71,6 +73,7 @@ export async function GET(req: NextRequest) {
     defaultPricePerKilo,
     transportCostPerKilo,
     stampCostPerKilo,
+    otherDeductionPct,
     totalValidatedKilos,
     lorryKilos,
     totalPendingCredit,
