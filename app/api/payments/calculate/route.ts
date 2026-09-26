@@ -16,8 +16,11 @@ export async function POST(req: NextRequest) {
   // Get cost settings
   const transportSetting = await prisma.settings.findUnique({ where: { key: 'transport_cost_per_kilo' } });
   const stampSetting = await prisma.settings.findUnique({ where: { key: 'stamp_cost_per_kilo' } });
+  const otherDeductionSetting = await prisma.settings.findUnique({ where: { key: 'other_deduction_pct' } });
+  
   const transportCostPerKilo = transportSetting ? parseFloat(transportSetting.value) : 6;
   const stampCostPerKilo = stampSetting ? parseFloat(stampSetting.value) : 0;
+  const otherDeductionPct = otherDeductionSetting ? parseFloat(otherDeductionSetting.value) : 5;
 
   // Total validated tea kilos for the month
   const collections = await prisma.teaCollection.findMany({
@@ -67,7 +70,9 @@ export async function POST(req: NextRequest) {
 
   // Calculate payment
   const grossPayment = totalKilos * pricePerKilo;
-  const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction + transportCostTotal + stampCostTotal;
+  const otherDeductionAmt = Math.round(grossPayment * (otherDeductionPct / 100) * 100) / 100;
+  
+  const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction + transportCostTotal + stampCostTotal + otherDeductionAmt;
   const netPayment = Math.max(0, grossPayment - totalDeductions);
 
   // Upsert payment record
@@ -83,8 +88,8 @@ export async function POST(req: NextRequest) {
       transportCostTotal,
       stampCostPerKilo,
       stampCostTotal,
-      otherDeductionPct: 0,
-      otherDeductionAmt: 0,
+      otherDeductionPct,
+      otherDeductionAmt,
       netPayment,
       settledCreditIds: creditIds,
       paid: true,
@@ -103,8 +108,8 @@ export async function POST(req: NextRequest) {
       transportCostTotal,
       stampCostPerKilo,
       stampCostTotal,
-      otherDeductionPct: 0,
-      otherDeductionAmt: 0,
+      otherDeductionPct,
+      otherDeductionAmt,
       netPayment,
       settledCreditIds: creditIds,
       paid: true,
@@ -153,7 +158,7 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
-      transportCostTotal + stampCostTotal,
+      transportCostTotal + stampCostTotal + otherDeductionAmt,
       netPayment
     ).catch(err => console.error('[SMS] Monthly payment SMS error:', err));
   }
