@@ -20,6 +20,7 @@ export default function InstantCashPage() {
   const [pricePerKilo, setPricePerKilo] = useState('');
   const [transportCostPerKilo, setTransportCostPerKilo] = useState(0);
   const [stampCostPerKilo, setStampCostPerKilo] = useState(0);
+  const [otherDeductionPct, setOtherDeductionPct] = useState(5);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function InstantCashPage() {
         setPricePerKilo(settings.tea_price_per_kilo || '');
         setTransportCostPerKilo(parseFloat(settings.transport_cost_per_kilo) || 6);
         setStampCostPerKilo(parseFloat(settings.stamp_cost_per_kilo) || 0);
+        setOtherDeductionPct(parseFloat(settings.other_deduction_pct) || 5);
       }
     } catch (e) {
       console.error(e);
@@ -75,7 +77,7 @@ export default function InstantCashPage() {
     setShowModal(true);
   };
 
-  const handlePrint = (collection: any, price: string, transportTotal: number, stampTotal: number, finalPayment: number) => {
+  const handlePrint = (collection: any, price: string, breakdown: any) => {
     printReceipt({
       type: 'instant-cash',
       receiptNo: `CASH-${collection.id}`,
@@ -83,22 +85,24 @@ export default function InstantCashPage() {
       customerName: collection.customer?.name,
       totalKilos: collection.netKilos,
       pricePerKilo: parseFloat(price || '0'),
-      transportDeduction: transportTotal,
-      stampDeduction: stampTotal,
-      netPayment: finalPayment,
+      transportDeduction: breakdown.transportTotal,
+      stampDeduction: breakdown.stampTotal,
+      otherDeduction: breakdown.otherTotal,
+      netPayment: breakdown.finalPayment,
     });
   };
 
   // Calculate costs for selected collection
   const getPaymentBreakdown = (collection: any) => {
-    if (!collection) return { grossPay: 0, transportTotal: 0, stampTotal: 0, finalPayment: 0 };
+    if (!collection) return { grossPay: 0, transportTotal: 0, stampTotal: 0, otherTotal: 0, finalPayment: 0 };
     const price = parseFloat(pricePerKilo) || 0;
     const grossPay = collection.netKilos * price;
     const isLorry = collection.lorryId !== null;
     const transportTotal = isLorry ? Math.round(collection.netKilos * transportCostPerKilo * 100) / 100 : 0;
     const stampTotal = Math.round(collection.netKilos * stampCostPerKilo * 100) / 100;
-    const finalPayment = Math.max(0, grossPay - transportTotal - stampTotal);
-    return { grossPay, transportTotal, stampTotal, finalPayment };
+    const otherTotal = Math.round(grossPay * (otherDeductionPct / 100) * 100) / 100;
+    const finalPayment = Math.max(0, grossPay - transportTotal - stampTotal - otherTotal);
+    return { grossPay, transportTotal, stampTotal, otherTotal, finalPayment };
   };
 
   const handleProcessPayment = async () => {
@@ -119,7 +123,7 @@ export default function InstantCashPage() {
         showToast('Payment processed successfully!', 'success');
         setShowModal(false);
         const breakdown = getPaymentBreakdown(selectedCollection);
-        handlePrint(selectedCollection, pricePerKilo, breakdown.transportTotal, breakdown.stampTotal, breakdown.finalPayment);
+        handlePrint(selectedCollection, pricePerKilo, breakdown);
         fetchCollections();
       } else {
         const err = await res.json();
@@ -196,6 +200,7 @@ export default function InstantCashPage() {
               <th>Customer</th>
               <th>Gross Kilos</th>
               <th>Water Deduction</th>
+              <th>Packaging Deduction</th>
               <th>Net Kilos</th>
               {activeTab === 'history' && <th>Paid Date</th>}
               <th>Status</th>
@@ -217,6 +222,7 @@ export default function InstantCashPage() {
                 </td>
                 <td>{c.kilosByDriver} kg</td>
                 <td style={{ color: '#dc2626' }}>{c.waterDeduction > 0 ? `- ${c.waterDeduction} kg` : '-'}</td>
+                <td style={{ color: '#d97706' }}>{c.packagingDeduction > 0 ? `- ${c.packagingDeduction} kg` : '-'}</td>
                 <td style={{ fontWeight: 600, color: 'var(--primary-700)' }}>{c.netKilos} kg</td>
                 {activeTab === 'history' && (
                   <td>{c.instantPaidAt ? new Date(c.instantPaidAt).toLocaleDateString() : '-'}</td>
@@ -239,7 +245,7 @@ export default function InstantCashPage() {
                       </span>
                       <button className="btn btn-secondary btn-sm" onClick={() => {
                         const b = getPaymentBreakdown(c);
-                        handlePrint(c, pricePerKilo || '0', b.transportTotal, b.stampTotal, b.finalPayment);
+                        handlePrint(c, pricePerKilo || '0', b);
                       }}>
                         <Printer size={14} />
                       </button>
@@ -284,7 +290,7 @@ export default function InstantCashPage() {
 
             {/* Deduction Breakdown */}
             {(() => {
-              const { grossPay, transportTotal, stampTotal, finalPayment } = getPaymentBreakdown(selectedCollection);
+              const { grossPay, transportTotal, stampTotal, otherTotal, finalPayment } = getPaymentBreakdown(selectedCollection);
               return (
                 <>
                   <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
@@ -302,6 +308,12 @@ export default function InstantCashPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#dc2626' }}>
                         <span>Stamp Cost ({stampCostPerKilo}/kg):</span>
                         <span>- Rs. {stampTotal.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {otherTotal > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#dc2626' }}>
+                        <span>Other Deduction ({otherDeductionPct}%):</span>
+                        <span>- Rs. {otherTotal.toLocaleString()}</span>
                       </div>
                     )}
                   </div>

@@ -14,6 +14,7 @@ interface ReceiptData {
   fertiliserDeduction?: number;
   transportDeduction?: number;
   stampDeduction?: number;
+  otherDeduction?: number;
   transportCostPerKilo?: number;
   stampCostPerKilo?: number;
   netPayment?: number;
@@ -276,6 +277,11 @@ export function printReceipt(data: ReceiptData) {
         <tr>
           <td class="label-cell">Stamp / මුද්දර</td>
           <td class="value-cell deduct">- Rs. ${data.stampDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
+        ${data.otherDeduction ? `
+        <tr>
+          <td class="label-cell">Other Deduction (5%)</td>
+          <td class="value-cell deduct">- Rs. ${data.otherDeduction?.toLocaleString()}</td>
         </tr>` : ''}
       </table>
 
