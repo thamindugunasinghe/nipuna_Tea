@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const customerId = parseInt(searchParams.get('customerId') || '0');
@@ -67,7 +69,9 @@ export async function GET(req: NextRequest) {
   let finalCollections = collections;
   let finalPendingCredits = pendingCredits;
 
-  if (existingPayment) {
+  const isPending = collections.length > 0 || pendingCredits.length > 0;
+
+  if (existingPayment && !isPending) {
     finalCollections = existingPayment.settledCollections;
     finalPendingCredits = existingPayment.settledCredits;
   }

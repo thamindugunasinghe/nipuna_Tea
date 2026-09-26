@@ -47,7 +47,7 @@ export default function PaymentsPage() {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/payments?startDate=${startDate}&endDate=${endDate}`);
+      const res = await fetch(`/api/payments?startDate=${startDate}&endDate=${endDate}`, { cache: 'no-store' });
       if (res.ok) setCustomers(await res.json());
     } catch (e) {
       console.error(e);

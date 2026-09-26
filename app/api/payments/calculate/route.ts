@@ -89,24 +89,30 @@ export async function POST(req: NextRequest) {
   const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction + transportCostTotal + stampCostTotal + otherDeductionAmt;
   const netPayment = Math.max(0, grossPayment - totalDeductions);
 
-  // Upsert payment record
+  // Accumulate with existing payment if it exists
+  const existingPayment = await prisma.monthlyPayment.findUnique({
+    where: { customerId_month_year: { customerId, month, year } }
+  });
+
+  let mergedCreditIds = creditIds;
+  if (existingPayment?.settledCreditIds) {
+    const oldIds = existingPayment.settledCreditIds as number[];
+    mergedCreditIds = Array.from(new Set([...oldIds, ...creditIds]));
+  }
+
   const payment = await prisma.monthlyPayment.upsert({
     where: { customerId_month_year: { customerId, month, year } },
     update: {
-      totalKilos,
-      pricePerKilo,
-      grossPayment,
-      groceryDeduction,
-      fertiliserDeduction,
-      cashAdvanceDeduction,
-      transportCostPerKilo,
-      transportCostTotal,
-      stampCostPerKilo,
-      stampCostTotal,
-      otherDeductionPct,
-      otherDeductionAmt,
-      netPayment,
-      settledCreditIds: creditIds,
+      totalKilos: { increment: totalKilos },
+      grossPayment: { increment: grossPayment },
+      groceryDeduction: { increment: groceryDeduction },
+      fertiliserDeduction: { increment: fertiliserDeduction },
+      cashAdvanceDeduction: { increment: cashAdvanceDeduction },
+      transportCostTotal: { increment: transportCostTotal },
+      stampCostTotal: { increment: stampCostTotal },
+      otherDeductionAmt: { increment: otherDeductionAmt },
+      netPayment: { increment: netPayment },
+      settledCreditIds: mergedCreditIds,
       paid: true,
       paidAt: new Date(),
     },
@@ -127,7 +133,7 @@ export async function POST(req: NextRequest) {
       otherDeductionPct,
       otherDeductionAmt,
       netPayment,
-      settledCreditIds: creditIds,
+      settledCreditIds: mergedCreditIds,
       paid: true,
       paidAt: new Date(),
     },

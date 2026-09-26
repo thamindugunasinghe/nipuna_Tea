@@ -15,6 +15,7 @@ export default function CollectionsPage() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [lorries, setLorries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [form, setForm] = useState({
@@ -38,6 +39,8 @@ export default function CollectionsPage() {
   }, []);
 
   const handleAdd = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const res = await fetch('/api/collections', {
         method: 'POST',
@@ -63,6 +66,7 @@ export default function CollectionsPage() {
         showToast(data.error || t('common.error'), 'error');
       }
     } catch (e) { showToast(t('common.error'), 'error'); }
+    finally { setSubmitting(false); }
   };
 
   const filtered = collections.filter(c => {
@@ -165,7 +169,9 @@ export default function CollectionsPage() {
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={t('collections.addCollection')}
         footer={<><button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-          <button className="btn btn-primary" onClick={handleAdd}>{t('common.save')}</button></>}>
+          <button className="btn btn-primary" onClick={handleAdd} disabled={submitting}>
+            {submitting ? 'Saving...' : t('common.save')}
+          </button></>}>
         <div className="form-group">
           <label className="form-label">{t('collections.collectionDate')} *</label>
           <input type="date" className="form-input" value={form.collectionDate} onChange={(e) => setForm({ ...form, collectionDate: e.target.value })} />
