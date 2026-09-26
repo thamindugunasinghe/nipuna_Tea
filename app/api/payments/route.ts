@@ -35,8 +35,10 @@ export async function GET(req: NextRequest) {
     include: {
       teaCollections: {
         where: {
-          collectionDate: { gte: startDate, lte: endDate },
+          collectionDate: { lte: endDate },
           kilosValidated: { not: null },
+          monthlyPaid: false,
+          instantPaid: false,
         },
         select: { kilosValidated: true },
       },
@@ -59,9 +61,11 @@ export async function GET(req: NextRequest) {
   const results = [];
 
   for (const customer of customers) {
-    const totalKilos = customer.teaCollections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
-    const totalPendingCredit = customer.creditPurchases.reduce((sum, p) => sum + p.totalCost, 0);
     const existingPayment = customer.monthlyPayments[0] || null;
+    const totalKilos = existingPayment 
+      ? existingPayment.totalKilos 
+      : customer.teaCollections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+    const totalPendingCredit = customer.creditPurchases.reduce((sum, p) => sum + p.totalCost, 0);
 
     // Only include customers that have collections or pending credits or a payment
     if (totalKilos > 0 || totalPendingCredit > 0 || existingPayment) {

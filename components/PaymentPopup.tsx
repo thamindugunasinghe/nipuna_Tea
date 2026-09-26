@@ -83,7 +83,10 @@ export default function PaymentPopup({
   const fertiliserDeduction = selectedCredits
     .filter((c: any) => c.itemType === 'fertiliser')
     .reduce((sum: number, c: any) => sum + c.totalCost, 0);
-  const totalDeductions = groceryDeduction + fertiliserDeduction;
+  const cashAdvanceDeduction = selectedCredits
+    .filter((c: any) => c.itemType === 'cash_advance')
+    .reduce((sum: number, c: any) => sum + c.totalCost, 0);
+  const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction;
 
   const transportCostPerKilo = data?.transportCostPerKilo || 0;
   const stampCostPerKilo = data?.stampCostPerKilo || 0;
@@ -109,6 +112,7 @@ export default function PaymentPopup({
           endDate,
           pricePerKilo: price,
           settledCreditIds: selectedCreditIds,
+          settledCollectionIds: data?.collections?.map((c: any) => c.id) || [],
         }),
       });
       if (res.ok) {
@@ -135,6 +139,7 @@ export default function PaymentPopup({
       grossPayment: p.grossPayment,
       groceryDeduction: p.groceryDeduction,
       fertiliserDeduction: p.fertiliserDeduction,
+      cashAdvanceDeduction: p.cashAdvanceDeduction,
       transportDeduction: transportCostTotal,
       stampDeduction: stampCostTotal,
       otherDeduction: otherDeductionAmt,
@@ -351,8 +356,8 @@ export default function PaymentPopup({
                             </td>
                             <td>{new Date(c.purchaseDate).toLocaleDateString()}</td>
                             <td>
-                              <span className={`badge ${c.itemType === 'grocery' ? 'badge-blue' : 'badge-amber'}`}>
-                                {c.itemType === 'grocery' ? 'Grocery' : 'Fertiliser'}
+                              <span className={`badge ${c.itemType === 'grocery' ? 'badge-blue' : c.itemType === 'cash_advance' ? 'badge-green' : 'badge-amber'}`}>
+                                {c.itemType === 'grocery' ? 'Grocery' : c.itemType === 'cash_advance' ? 'Cash Advance' : 'Fertiliser'}
                               </span>
                             </td>
                             <td>{c.description || c.fertiliser?.name || '-'}</td>
@@ -406,6 +411,12 @@ export default function PaymentPopup({
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#dc2626' }}>Fertiliser Deduction / පොහොර</span>
                       <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {fertiliserDeduction.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {cashAdvanceDeduction > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#dc2626' }}>Cash Advance / අත්තිකාරම් මුදල්</span>
+                      <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {cashAdvanceDeduction.toLocaleString()}</span>
                     </div>
                   )}
                   {transportCostTotal > 0 && (

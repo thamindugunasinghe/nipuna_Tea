@@ -6,3 +6,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   await prisma.driver.update({ where: { id: parseInt(id) }, data: { active: false } });
   return NextResponse.json({ success: true });
 }
+
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await req.json();
+  const driver = await prisma.driver.update({
+    where: { id: parseInt(id) },
+    data: {
+      name: body.name,
+      phone: body.phone,
+      nic: body.nic,
+      lorryId: body.lorryId,
+    }
+  });
+  return NextResponse.json(driver);
+}

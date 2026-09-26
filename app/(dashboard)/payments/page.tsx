@@ -17,14 +17,15 @@ interface CustomerSummary {
   payment: any;
 }
 
-// Helper to get first and last day of current month
 function getMonthRange() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const end = new Date(y, now.getMonth() + 1, 0);
+  const d = String(end.getDate()).padStart(2, '0');
   return {
-    startDate: start.toISOString().split('T')[0],
-    endDate: end.toISOString().split('T')[0],
+    startDate: `${y}-${m}-01`,
+    endDate: `${y}-${m}-${d}`,
   };
 }
 

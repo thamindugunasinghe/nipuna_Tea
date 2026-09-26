@@ -4,7 +4,7 @@ import { sendMonthlyPaymentSms } from '@/lib/sms';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { customerId, month, year, startDate, endDate, pricePerKilo, settledCreditIds } = body;
+  const { customerId, month, year, startDate, endDate, pricePerKilo, settledCreditIds, settledCollectionIds } = body;
 
   if (!customerId || !month || !year || !pricePerKilo) {
     return NextResponse.json(
@@ -27,14 +27,11 @@ export async function POST(req: NextRequest) {
   const stampCostPerKilo = getSetting('stamp_cost_per_kilo', 0);
   const otherDeductionPct = getSetting('other_deduction_pct', 5);
 
-  // Fetch validated collections and include driver for response
+  const collectionIds: number[] = settledCollectionIds || [];
   const collections = await prisma.teaCollection.findMany({
     where: { 
+      id: { in: collectionIds },
       customerId, 
-      collectionDate: { 
-        gte: startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(year, month - 1, 1), 
-        lte: endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(year, month, 0, 23, 59, 59, 999) 
-      },
       kilosValidated: { not: null } 
     },
     include: { driver: true },
@@ -101,6 +98,7 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
+      cashAdvanceDeduction,
       transportCostPerKilo,
       transportCostTotal,
       stampCostPerKilo,
@@ -121,6 +119,7 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
+      cashAdvanceDeduction,
       transportCostPerKilo,
       transportCostTotal,
       stampCostPerKilo,
@@ -143,7 +142,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
-
+  // Mark collections as paid and link to payment
+  if (collections.length > 0) {
+    await prisma.teaCollection.updateMany({
+      where: { id: { in: collections.map(c => c.id) }, customerId },
+      data: { monthlyPaid: true, monthlyPaymentId: payment.id },
+    });
+  }
 
   // Send SMS notification to customer (async, non-blocking)
   const monthNames = [
@@ -161,6 +166,7 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
+      cashAdvanceDeduction,
       transportCostTotal + stampCostTotal + otherDeductionAmt,
       netPayment
     ).catch(err => console.error('[SMS] Monthly payment SMS error:', err));

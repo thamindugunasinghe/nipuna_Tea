@@ -6,3 +6,16 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   await prisma.lorry.update({ where: { id: parseInt(id) }, data: { active: false } });
   return NextResponse.json({ success: true });
 }
+
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await req.json();
+  const lorry = await prisma.lorry.update({
+    where: { id: parseInt(id) },
+    data: {
+      lorryNumber: body.lorryNumber,
+      capacity: body.capacity,
+    }
+  });
+  return NextResponse.json(lorry);
+}

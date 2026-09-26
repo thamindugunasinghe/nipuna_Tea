@@ -205,7 +205,12 @@ export default function CollectionsPage() {
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">{t('collections.driver')}</label>
-            <select className="form-select" value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })}>
+            <select className="form-select" value={form.driverId} onChange={(e) => {
+              const dId = e.target.value;
+              const driver = drivers.find(d => d.id === parseInt(dId));
+              const lId = driver?.lorryId ? String(driver.lorryId) : form.lorryId;
+              setForm({ ...form, driverId: dId, lorryId: lId });
+            }}>
               <option value="">{t('collections.selectDriver')}</option>
               {drivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>

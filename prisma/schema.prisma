@@ -120,6 +120,8 @@ model TeaCollection {
   kilosValidated     Float?   @map("kilos_validated")
   instantPaid    Boolean  @default(false) @map("instant_paid")
   instantPaidAt  DateTime? @map("instant_paid_at")
+  monthlyPaid    Boolean  @default(false) @map("monthly_paid")
+  monthlyPaymentId Int?   @map("monthly_payment_id")
   waterScore     Int      @default(0) @map("water_score") // DEPRECATED - kept for old data
   collectionDate DateTime @map("collection_date")
   month          Int
@@ -129,6 +131,7 @@ model TeaCollection {
   customer Customer @relation(fields: [customerId], references: [id])
   driver   Driver?  @relation(fields: [driverId], references: [id])
   lorry    Lorry?   @relation(fields: [lorryId], references: [id])
+  monthlyPayment MonthlyPayment? @relation(fields: [monthlyPaymentId], references: [id])
 
   @@map("tea_collections")
 }
@@ -162,6 +165,7 @@ model MonthlyPayment {
   grossPayment        Float    @map("gross_payment")
   groceryDeduction    Float    @default(0) @map("grocery_deduction")
   fertiliserDeduction Float    @default(0) @map("fertiliser_deduction")
+  cashAdvanceDeduction Float   @default(0) @map("cash_advance_deduction")
   transportCostPerKilo Float   @default(0) @map("transport_cost_per_kilo")
   transportCostTotal  Float    @default(0) @map("transport_cost_total")
   stampCostPerKilo    Float    @default(0) @map("stamp_cost_per_kilo")
@@ -176,6 +180,7 @@ model MonthlyPayment {
 
   customer        Customer         @relation(fields: [customerId], references: [id])
   settledCredits  CreditPurchase[]
+  settledCollections TeaCollection[]
 
   @@unique([customerId, month, year])
   @@map("monthly_payments")

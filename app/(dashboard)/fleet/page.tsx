@@ -15,6 +15,8 @@ export default function FleetPage() {
   const [loading, setLoading] = useState(true);
   const [showLorryModal, setShowLorryModal] = useState(false);
   const [showDriverModal, setShowDriverModal] = useState(false);
+  const [editingLorryId, setEditingLorryId] = useState<number | null>(null);
+  const [editingDriverId, setEditingDriverId] = useState<number | null>(null);
   const [lorryForm, setLorryForm] = useState({ lorryNumber: '', capacity: '' });
   const [driverForm, setDriverForm] = useState({ name: '', phone: '', nic: '', lorryId: '' });
 
@@ -36,24 +38,40 @@ export default function FleetPage() {
 
   const saveLorry = async () => {
     try {
-      const res = await fetch('/api/fleet/lorries', {
-        method: 'POST',
+      const url = editingLorryId ? `/api/fleet/lorries/${editingLorryId}` : '/api/fleet/lorries';
+      const method = editingLorryId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lorryNumber: lorryForm.lorryNumber, capacity: lorryForm.capacity ? parseFloat(lorryForm.capacity) : null }),
       });
-      if (res.ok) { showToast(t('fleet.addLorrySuccess'), 'success'); setShowLorryModal(false); refresh(); setLorryForm({ lorryNumber: '', capacity: '' }); }
+      if (res.ok) { 
+        showToast(editingLorryId ? t('common.save') + ' Success' : t('fleet.addLorrySuccess'), 'success'); 
+        setShowLorryModal(false); 
+        refresh(); 
+        setLorryForm({ lorryNumber: '', capacity: '' }); 
+        setEditingLorryId(null);
+      }
       else showToast(t('common.error'), 'error');
     } catch (e) { showToast(t('common.error'), 'error'); }
   };
 
   const saveDriver = async () => {
     try {
-      const res = await fetch('/api/fleet/drivers', {
-        method: 'POST',
+      const url = editingDriverId ? `/api/fleet/drivers/${editingDriverId}` : '/api/fleet/drivers';
+      const method = editingDriverId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...driverForm, lorryId: driverForm.lorryId ? parseInt(driverForm.lorryId) : null }),
       });
-      if (res.ok) { showToast(t('fleet.addDriverSuccess'), 'success'); setShowDriverModal(false); refresh(); setDriverForm({ name: '', phone: '', nic: '', lorryId: '' }); }
+      if (res.ok) { 
+        showToast(editingDriverId ? t('common.save') + ' Success' : t('fleet.addDriverSuccess'), 'success'); 
+        setShowDriverModal(false); 
+        refresh(); 
+        setDriverForm({ name: '', phone: '', nic: '', lorryId: '' }); 
+        setEditingDriverId(null);
+      }
       else showToast(t('common.error'), 'error');
     } catch (e) { showToast(t('common.error'), 'error'); }
   };
@@ -79,7 +97,17 @@ export default function FleetPage() {
       <div className="page-header">
         <h1>{t('fleet.title')}</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-primary" onClick={() => tab === 'lorries' ? setShowLorryModal(true) : setShowDriverModal(true)}>
+          <button className="btn btn-primary" onClick={() => {
+            if (tab === 'lorries') {
+              setLorryForm({ lorryNumber: '', capacity: '' });
+              setEditingLorryId(null);
+              setShowLorryModal(true);
+            } else {
+              setDriverForm({ name: '', phone: '', nic: '', lorryId: '' });
+              setEditingDriverId(null);
+              setShowDriverModal(true);
+            }
+          }}>
             <Plus size={18} /> {tab === 'lorries' ? t('fleet.addLorry') : t('fleet.addDriver')}
           </button>
         </div>
@@ -106,7 +134,14 @@ export default function FleetPage() {
                   <td style={{ fontWeight: 600 }}>{l.lorryNumber}</td>
                   <td>{l.capacity ? `${l.capacity} ${t('common.kg')}` : '-'}</td>
                   <td>{l.drivers?.map((d: any) => d.name).join(', ') || '-'}</td>
-                  <td><button className="btn btn-ghost btn-icon" onClick={() => deleteLorry(l.id)}><Trash2 size={16} /></button></td>
+                  <td>
+                    <button className="btn btn-ghost btn-icon" onClick={() => {
+                      setLorryForm({ lorryNumber: l.lorryNumber, capacity: l.capacity ? String(l.capacity) : '' });
+                      setEditingLorryId(l.id);
+                      setShowLorryModal(true);
+                    }}><Edit2 size={16} /></button>
+                    <button className="btn btn-ghost btn-icon" onClick={() => deleteLorry(l.id)}><Trash2 size={16} /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -125,7 +160,14 @@ export default function FleetPage() {
                   <td>{d.phone || '-'}</td>
                   <td>{d.nic || '-'}</td>
                   <td>{d.lorry?.lorryNumber || '-'}</td>
-                  <td><button className="btn btn-ghost btn-icon" onClick={() => deleteDriver(d.id)}><Trash2 size={16} /></button></td>
+                  <td>
+                    <button className="btn btn-ghost btn-icon" onClick={() => {
+                      setDriverForm({ name: d.name, phone: d.phone || '', nic: d.nic || '', lorryId: d.lorryId ? String(d.lorryId) : '' });
+                      setEditingDriverId(d.id);
+                      setShowDriverModal(true);
+                    }}><Edit2 size={16} /></button>
+                    <button className="btn btn-ghost btn-icon" onClick={() => deleteDriver(d.id)}><Trash2 size={16} /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -134,8 +176,8 @@ export default function FleetPage() {
       )}
 
       {/* Lorry Modal */}
-      <Modal isOpen={showLorryModal} onClose={() => setShowLorryModal(false)} title={t('fleet.addLorry')}
-        footer={<><button className="btn btn-secondary" onClick={() => setShowLorryModal(false)}>{t('common.cancel')}</button>
+      <Modal isOpen={showLorryModal} onClose={() => { setShowLorryModal(false); setEditingLorryId(null); }} title={editingLorryId ? 'Edit Lorry' : t('fleet.addLorry')}
+        footer={<><button className="btn btn-secondary" onClick={() => { setShowLorryModal(false); setEditingLorryId(null); }}>{t('common.cancel')}</button>
           <button className="btn btn-primary" onClick={saveLorry}>{t('common.save')}</button></>}>
         <div className="form-group">
           <label className="form-label">{t('fleet.lorryNumber')} *</label>
@@ -148,8 +190,8 @@ export default function FleetPage() {
       </Modal>
 
       {/* Driver Modal */}
-      <Modal isOpen={showDriverModal} onClose={() => setShowDriverModal(false)} title={t('fleet.addDriver')}
-        footer={<><button className="btn btn-secondary" onClick={() => setShowDriverModal(false)}>{t('common.cancel')}</button>
+      <Modal isOpen={showDriverModal} onClose={() => { setShowDriverModal(false); setEditingDriverId(null); }} title={editingDriverId ? 'Edit Driver' : t('fleet.addDriver')}
+        footer={<><button className="btn btn-secondary" onClick={() => { setShowDriverModal(false); setEditingDriverId(null); }}>{t('common.cancel')}</button>
           <button className="btn btn-primary" onClick={saveDriver}>{t('common.save')}</button></>}>
         <div className="form-group">
           <label className="form-label">{t('fleet.driverName')} *</label>

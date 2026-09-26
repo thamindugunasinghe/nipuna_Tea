@@ -30,9 +30,10 @@ export async function GET(req: NextRequest) {
       where: { 
         customerId, 
         collectionDate: { 
-          gte: startDate ? new Date(`${startDate}T00:00:00.000Z`) : new Date(year, month - 1, 1), 
           lte: endDate ? new Date(`${endDate}T23:59:59.999Z`) : new Date(year, month, 0, 23, 59, 59, 999) 
-        } 
+        },
+        monthlyPaid: false,
+        instantPaid: false,
       },
       include: { driver: true, lorry: true },
       orderBy: { collectionDate: 'asc' },
@@ -56,8 +57,20 @@ export async function GET(req: NextRequest) {
     // 4. Existing payment for this month
     prisma.monthlyPayment.findUnique({
       where: { customerId_month_year: { customerId, month, year } },
+      include: { 
+        settledCredits: { include: { fertiliser: true } }, 
+        settledCollections: { include: { driver: true, lorry: true }, orderBy: { collectionDate: 'asc' } } 
+      }
     })
   ]);
+
+  let finalCollections = collections;
+  let finalPendingCredits = pendingCredits;
+
+  if (existingPayment) {
+    finalCollections = existingPayment.settledCollections;
+    finalPendingCredits = existingPayment.settledCredits;
+  }
 
   const getSetting = (key: string, def: number) => {
     const s = settings.find(x => x.key === key);
@@ -70,20 +83,20 @@ export async function GET(req: NextRequest) {
   const otherDeductionPct = getSetting('other_deduction_pct', 5);
 
   // Calculate totals
-  const totalValidatedKilos = collections
+  const totalValidatedKilos = finalCollections
     .filter(c => c.kilosValidated != null)
     .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
 
-  const lorryKilos = collections
+  const lorryKilos = finalCollections
     .filter(c => c.kilosValidated != null && c.lorryId !== null)
     .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
 
-  const totalPendingCredit = pendingCredits.reduce((sum, p) => sum + p.totalCost, 0);
+  const totalPendingCredit = finalPendingCredits.reduce((sum, p) => sum + p.totalCost, 0);
 
   return NextResponse.json({
     customer,
-    collections,
-    pendingCredits,
+    collections: finalCollections,
+    pendingCredits: finalPendingCredits,
     defaultPricePerKilo,
     transportCostPerKilo,
     stampCostPerKilo,

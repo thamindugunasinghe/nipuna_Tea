@@ -12,6 +12,7 @@ interface ReceiptData {
   grossPayment?: number;
   groceryDeduction?: number;
   fertiliserDeduction?: number;
+  cashAdvanceDeduction?: number;
   transportDeduction?: number;
   stampDeduction?: number;
   otherDeduction?: number;
@@ -139,6 +140,11 @@ export function printReceipt(data: ReceiptData) {
           <td class="label-cell">Fertiliser / පොහොර</td>
           <td class="value-cell deduct">- Rs. ${data.fertiliserDeduction?.toLocaleString()}</td>
         </tr>
+        ${data.cashAdvanceDeduction ? `
+        <tr>
+          <td class="label-cell">Cash Advance / අත්තිකාරම්</td>
+          <td class="value-cell deduct">- Rs. ${data.cashAdvanceDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
         ${data.transportDeduction ? `
         <tr>
           <td class="label-cell">Transport (${data.transportCostPerKilo}/kg) / ප්‍රවාහන</td>
