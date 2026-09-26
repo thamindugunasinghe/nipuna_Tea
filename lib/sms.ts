@@ -157,6 +157,7 @@ export async function sendMonthlyPaymentSms(
   grossPayment: number,
   groceryDeduction: number,
   fertiliserDeduction: number,
+  cashAdvanceDeduction: number,
   transAndStampAmt: number,
   netPayment: number
 ): Promise<void> {
@@ -166,6 +167,9 @@ export async function sendMonthlyPaymentSms(
   }
   if (fertiliserDeduction > 0) {
     deductions += `\nFertiliser: -Rs.${fertiliserDeduction.toLocaleString()}`;
+  }
+  if (cashAdvanceDeduction > 0) {
+    deductions += `\nAdvance: -Rs.${cashAdvanceDeduction.toLocaleString()}`;
   }
   if (transAndStampAmt > 0) {
     deductions += `\nTrans/Stamp: -Rs.${Math.round(transAndStampAmt).toLocaleString()}`;
