@@ -25,43 +25,45 @@ export async function GET(req: NextRequest) {
     endDate = new Date(year, month, 0, 23, 59, 59, 999);
   }
 
-  // Get all active regular customers with their data in the date range
+  const paymentMonth = startDate.getMonth() + 1;
+  const paymentYear = startDate.getFullYear();
+
+  // Get all active regular customers with their filtered data in ONE query
   const customers = await prisma.customer.findMany({
     where: { active: true, type: 'regular' },
     orderBy: { name: 'asc' },
+    include: {
+      teaCollections: {
+        where: {
+          collectionDate: { gte: startDate, lte: endDate },
+          kilosValidated: { not: null },
+        },
+        select: { kilosValidated: true },
+      },
+      creditPurchases: {
+        where: {
+          settled: false,
+          purchaseDate: { lte: endDate },
+        },
+        select: { totalCost: true },
+      },
+      monthlyPayments: {
+        where: {
+          month: paymentMonth,
+          year: paymentYear,
+        },
+      },
+    },
   });
 
   const results = [];
 
   for (const customer of customers) {
-    // Total validated kilos within the date range
-    const collections = await prisma.teaCollection.findMany({
-      where: {
-        customerId: customer.id,
-        collectionDate: { gte: startDate, lte: endDate },
-        kilosValidated: { not: null },
-      },
-    });
-    const totalKilos = collections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+    const totalKilos = customer.teaCollections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+    const totalPendingCredit = customer.creditPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+    const existingPayment = customer.monthlyPayments[0] || null;
 
-    // Pending credit purchases within the date range
-    const pendingCredits = await prisma.creditPurchase.findMany({
-      where: {
-        customerId: customer.id,
-        settled: false,
-        purchaseDate: { lte: endDate },
-      },
-    });
-    const totalPendingCredit = pendingCredits.reduce((sum, p) => sum + p.totalCost, 0);
-
-    // Check if payment already exists for the month of the start date
-    const paymentMonth = startDate.getMonth() + 1;
-    const paymentYear = startDate.getFullYear();
-    const existingPayment = await prisma.monthlyPayment.findUnique({
-      where: { customerId_month_year: { customerId: customer.id, month: paymentMonth, year: paymentYear } },
-    });
-
-    // Only include customers that have collections or pending credits
+    // Only include customers that have collections or pending credits or a payment
     if (totalKilos > 0 || totalPendingCredit > 0 || existingPayment) {
       results.push({
         customerId: customer.id,
@@ -70,7 +72,7 @@ export async function GET(req: NextRequest) {
         customerId_display: customer.customerId,
         totalKilos,
         totalPendingCredit,
-        pendingCreditCount: pendingCredits.length,
+        pendingCreditCount: customer.creditPurchases.length,
         payment: existingPayment,
       });
     }

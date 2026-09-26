@@ -9,7 +9,7 @@ import Modal from '@/components/Modal';
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { toast, showToast, hideToast } = useToast();
-  const [settings, setSettings] = useState<any>({ tea_price_per_kilo: '', commission_rate: '5', other_deduction_rate: '5' });
+  const [settings, setSettings] = useState<any>({ tea_price_per_kilo: '', commission_rate: '5', transport_cost_per_kilo: '6', stamp_cost_per_kilo: '0' });
   const [fertilisers, setFertilisers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -152,10 +152,19 @@ export default function SettingsPage() {
                 <input type="number" step="0.1" className="form-input" value={settings.commission_rate}
                   onChange={(e) => setSettings({ ...settings, commission_rate: e.target.value })} />
               </div>
+            </div>
+            <div className="form-row">
               <div className="form-group">
-                <label className="form-label">{t('settings.otherDeduction')}</label>
-                <input type="number" step="0.1" className="form-input" value={settings.other_deduction_rate}
-                  onChange={(e) => setSettings({ ...settings, other_deduction_rate: e.target.value })} />
+                <label className="form-label">Transport Cost per Kilo (Rs.) / ප්‍රවාහන වියදම (කි.ග්‍ර.)</label>
+                <input type="number" step="0.01" className="form-input" value={settings.transport_cost_per_kilo}
+                  onChange={(e) => setSettings({ ...settings, transport_cost_per_kilo: e.target.value })} />
+                <span className="form-hint">Only for lorry collections / ලොරි එකතු කිරීම් සඳහා පමණි</span>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Stamp Cost per Kilo (Rs.) / මුද්දර වියදම (කි.ග්‍ර.)</label>
+                <input type="number" step="0.01" className="form-input" value={settings.stamp_cost_per_kilo}
+                  onChange={(e) => setSettings({ ...settings, stamp_cost_per_kilo: e.target.value })} />
+                <span className="form-hint">For billing & stamps, applies to all / බිල්පත් හා මුද්දර, සියල්ලටම අදාළ</span>
               </div>
             </div>
             <button className="btn btn-primary" onClick={saveSettings}><Save size={18} /> {t('common.save')}</button>

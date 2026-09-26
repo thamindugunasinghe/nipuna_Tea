@@ -83,9 +83,13 @@ export default function PaymentPopup({
     .reduce((sum: number, c: any) => sum + c.totalCost, 0);
   const totalDeductions = groceryDeduction + fertiliserDeduction;
 
-  const otherDeductionRate = data?.otherDeductionRate || 5;
-  const otherDeductionAmt = grossPayment * (otherDeductionRate / 100);
-  const netPayment = Math.max(0, grossPayment - totalDeductions - otherDeductionAmt);
+  // Transport cost: only for lorry collections
+  const transportCostPerKilo = data?.transportCostPerKilo || 0;
+  const stampCostPerKilo = data?.stampCostPerKilo || 0;
+  const lorryKilos = data?.lorryKilos || 0;
+  const transportCostTotal = Math.round(lorryKilos * transportCostPerKilo * 100) / 100;
+  const stampCostTotal = Math.round(totalKilos * stampCostPerKilo * 100) / 100;
+  const netPayment = Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal);
 
   const handlePay = async () => {
     if (!price || price <= 0) return;
@@ -126,13 +130,15 @@ export default function PaymentPopup({
       grossPayment: p.grossPayment,
       groceryDeduction: p.groceryDeduction,
       fertiliserDeduction: p.fertiliserDeduction,
-      otherDeduction: p.otherDeductionAmt,
+      transportDeduction: transportCostTotal,
+      stampDeduction: stampCostTotal,
+      transportCostPerKilo: transportCostPerKilo,
+      stampCostPerKilo: stampCostPerKilo,
       netPayment: p.netPayment,
       month: monthNames[month - 1],
       year: year,
       collections: paymentResult.collections,
       settledCredits: paymentResult.settledCredits,
-      otherDeductionPct: p.otherDeductionPct,
     });
   };
 
@@ -396,10 +402,18 @@ export default function PaymentPopup({
                       <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {fertiliserDeduction.toLocaleString()}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#dc2626' }}>Other ({otherDeductionRate}%) / වෙනත්</span>
-                    <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {otherDeductionAmt.toLocaleString()}</span>
-                  </div>
+                  {transportCostTotal > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#dc2626' }}>Transport ({transportCostPerKilo}/kg × {lorryKilos}kg) / ප්‍රවාහන</span>
+                      <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {transportCostTotal.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {stampCostTotal > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#dc2626' }}>Stamp ({stampCostPerKilo}/kg) / මුද්දර</span>
+                      <span style={{ fontWeight: 600, color: '#dc2626' }}>- Rs. {stampCostTotal.toLocaleString()}</span>
+                    </div>
+                  )}
 
                   <div style={{ borderTop: '2px solid var(--primary-600)', margin: '6px 0' }} />
 

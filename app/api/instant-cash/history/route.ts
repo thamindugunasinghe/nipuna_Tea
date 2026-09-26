@@ -20,7 +20,7 @@ export async function GET() {
     
     const processed = collections.map(c => ({
       ...c,
-      netKilos: c.kilosByDriver - (c.waterDeduction || 0)
+      netKilos: c.kilosByDriver - (c.waterDeduction || 0) - (c.packagingDeduction || 0)
     }));
 
     return NextResponse.json(processed);

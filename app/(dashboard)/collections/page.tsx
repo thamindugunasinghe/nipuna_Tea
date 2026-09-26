@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { Plus, Leaf, CheckCircle, Droplets, Truck, Warehouse } from 'lucide-react';
+import { Plus, Leaf, CheckCircle, Droplets, Truck, Warehouse, Package } from 'lucide-react';
 import Modal from '@/components/Modal';
 import Toast, { useToast } from '@/components/Toast';
 import CustomerSearch from '@/components/CustomerSearch';
@@ -18,7 +18,7 @@ export default function CollectionsPage() {
   const [showModal, setShowModal] = useState(false);
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [form, setForm] = useState({
-    customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0',
+    customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0', packagingDeduction: '0',
     collectionDate: new Date().toISOString().split('T')[0],
     collectionType: 'lorry' as 'lorry' | 'warehouse',
   });
@@ -48,6 +48,7 @@ export default function CollectionsPage() {
           lorryId: form.collectionType === 'warehouse' ? null : (form.lorryId ? parseInt(form.lorryId) : null),
           kilosByDriver: parseFloat(form.kilosByDriver),
           waterDeduction: parseFloat(form.waterDeduction) || 0,
+          packagingDeduction: parseFloat(form.packagingDeduction) || 0,
           collectionDate: form.collectionDate,
         }),
       });
@@ -56,7 +57,7 @@ export default function CollectionsPage() {
         setShowModal(false);
         const data = await fetch('/api/collections').then(r => r.json());
         setCollections(data);
-        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0', collectionDate: new Date().toISOString().split('T')[0], collectionType: 'lorry' });
+        setForm({ customerId: '', driverId: '', lorryId: '', kilosByDriver: '', waterDeduction: '0', packagingDeduction: '0', collectionDate: new Date().toISOString().split('T')[0], collectionType: 'lorry' });
       } else {
         const data = await res.json();
         showToast(data.error || t('common.error'), 'error');
@@ -105,7 +106,8 @@ export default function CollectionsPage() {
               <th>{t('collections.driver')}</th>
               <th>{t('collections.lorry')}</th>
               <th>{t('collections.kilosByDriver')}</th>
-              <th>Water Deduction / ජල අඩු කිරීම</th>
+              <th>Water Ded. / ජල අඩු</th>
+              <th>Packaging Ded. / ඇසුරුම් අඩු</th>
               <th>Net Kilos / ශුද්ධ බර</th>
             </tr>
           </thead>
@@ -113,8 +115,9 @@ export default function CollectionsPage() {
             {filtered.length === 0 ? (
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
             ) : filtered.map((c, i) => {
-              const deduction = c.waterDeduction || 0;
-              const netKilos = c.kilosValidated ?? (c.kilosByDriver - deduction);
+              const waterDed = c.waterDeduction || 0;
+              const packDed = c.packagingDeduction || 0;
+              const netKilos = c.kilosValidated ?? (c.kilosByDriver - waterDed - packDed);
               return (
                 <tr key={c.id}>
                   <td>{i + 1}</td>
@@ -128,10 +131,20 @@ export default function CollectionsPage() {
                   <td>{c.lorry?.lorryNumber || (!c.driverId && !c.lorryId ? <span className="badge badge-purple" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Warehouse size={12} />{t('collections.warehouse')}</span> : '—')}</td>
                   <td>{c.kilosByDriver} {t('common.kg')}</td>
                   <td>
-                    {deduction > 0 ? (
+                    {waterDed > 0 ? (
                       <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <Droplets size={12} />
-                        - {deduction} {t('common.kg')}
+                        - {waterDed} {t('common.kg')}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--gray-400)' }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    {packDed > 0 ? (
+                      <span className="badge badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Package size={12} />
+                        - {packDed} {t('common.kg')}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--gray-400)' }}>—</span>
@@ -217,6 +230,12 @@ export default function CollectionsPage() {
             <input type="number" step="0.1" min="0" className="form-input" placeholder="0"
               value={form.waterDeduction} onChange={(e) => setForm({ ...form, waterDeduction: e.target.value })} />
           </div>
+          <div className="form-group">
+            <label className="form-label">Packaging Ded. (kg) / ඇසුරුම් අඩු</label>
+            <input type="number" step="0.1" min="0" className="form-input" placeholder="0"
+              value={form.packagingDeduction} onChange={(e) => setForm({ ...form, packagingDeduction: e.target.value })} />
+            <span className="form-hint">Crates & bags / ප්ලාස්ටික් පෙට්ටි සහ ගෝනි</span>
+          </div>
         </div>
         {/* Net Kilos Preview */}
         {form.kilosByDriver && (
@@ -226,7 +245,7 @@ export default function CollectionsPage() {
           }}>
             <span style={{ fontSize: '13px', color: 'var(--gray-600)' }}>Net Kilos / ශුද්ධ බර:</span>
             <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary-700)' }}>
-              {Math.max(0, (parseFloat(form.kilosByDriver) || 0) - (parseFloat(form.waterDeduction) || 0)).toFixed(1)} kg
+              {Math.max(0, (parseFloat(form.kilosByDriver) || 0) - (parseFloat(form.waterDeduction) || 0) - (parseFloat(form.packagingDeduction) || 0)).toFixed(1)} kg
             </span>
           </div>
         )}

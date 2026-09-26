@@ -23,14 +23,14 @@ export async function GET(req: NextRequest) {
       unsettledCredits,
       monthlyPayments,
     ] = await Promise.all([
-      // Today's collection
-      prisma.teaCollection.aggregate({
-        _sum: { kilosValidated: true, kilosByDriver: true },
+      // Fetch raw collections to correctly calculate net kilos
+      prisma.teaCollection.findMany({
+        select: { kilosValidated: true, kilosByDriver: true, waterDeduction: true, packagingDeduction: true },
         where: { collectionDate: { gte: today, lt: tomorrow } },
       }),
       // Monthly collection
-      prisma.teaCollection.aggregate({
-        _sum: { kilosValidated: true, kilosByDriver: true },
+      prisma.teaCollection.findMany({
+        select: { kilosValidated: true, kilosByDriver: true, waterDeduction: true, packagingDeduction: true },
         where: { month, year },
       }),
       prisma.customer.count({ where: { active: true } }),
@@ -74,10 +74,13 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const monthlyKilos = monthlyCollections._sum.kilosValidated || monthlyCollections._sum.kilosByDriver || 0;
+    const calcNet = (c: any) => c.kilosValidated ?? (c.kilosByDriver - (c.waterDeduction || 0) - (c.packagingDeduction || 0));
+    
+    const todayKilos = todayCollections.reduce((sum, c) => sum + calcNet(c), 0);
+    const monthlyKilos = monthlyCollections.reduce((sum, c) => sum + calcNet(c), 0);
 
     return NextResponse.json({
-      todayCollection: todayCollections._sum.kilosValidated || todayCollections._sum.kilosByDriver || 0,
+      todayCollection: todayKilos,
       monthlyCollection: monthlyKilos,
       totalCustomers,
       activeDrivers,

@@ -13,9 +13,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Get other deduction rate from settings
-  const deductionSetting = await prisma.settings.findUnique({ where: { key: 'other_deduction_rate' } });
-  const otherDeductionPct = deductionSetting ? parseFloat(deductionSetting.value) : 5;
+  // Get cost settings
+  const transportSetting = await prisma.settings.findUnique({ where: { key: 'transport_cost_per_kilo' } });
+  const stampSetting = await prisma.settings.findUnique({ where: { key: 'stamp_cost_per_kilo' } });
+  const transportCostPerKilo = transportSetting ? parseFloat(transportSetting.value) : 6;
+  const stampCostPerKilo = stampSetting ? parseFloat(stampSetting.value) : 0;
 
   // Total validated tea kilos for the month
   const collections = await prisma.teaCollection.findMany({
@@ -29,6 +31,15 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Calculate transport cost: only for lorry collections (lorryId is not null)
+  const lorryKilos = collections
+    .filter(c => c.lorryId !== null)
+    .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+  const transportCostTotal = Math.round(lorryKilos * transportCostPerKilo * 100) / 100;
+
+  // Stamp cost: applies to ALL collections
+  const stampCostTotal = Math.round(totalKilos * stampCostPerKilo * 100) / 100;
 
   // Get selected credit purchases to settle
   const creditIds: number[] = settledCreditIds || [];
@@ -56,8 +67,8 @@ export async function POST(req: NextRequest) {
 
   // Calculate payment
   const grossPayment = totalKilos * pricePerKilo;
-  const otherDeductionAmt = grossPayment * (otherDeductionPct / 100);
-  const netPayment = Math.max(0, grossPayment - groceryDeduction - fertiliserDeduction - cashAdvanceDeduction - otherDeductionAmt);
+  const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction + transportCostTotal + stampCostTotal;
+  const netPayment = Math.max(0, grossPayment - totalDeductions);
 
   // Upsert payment record
   const payment = await prisma.monthlyPayment.upsert({
@@ -68,8 +79,12 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
-      otherDeductionPct,
-      otherDeductionAmt,
+      transportCostPerKilo,
+      transportCostTotal,
+      stampCostPerKilo,
+      stampCostTotal,
+      otherDeductionPct: 0,
+      otherDeductionAmt: 0,
       netPayment,
       settledCreditIds: creditIds,
       paid: true,
@@ -84,8 +99,12 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
-      otherDeductionPct,
-      otherDeductionAmt,
+      transportCostPerKilo,
+      transportCostTotal,
+      stampCostPerKilo,
+      stampCostTotal,
+      otherDeductionPct: 0,
+      otherDeductionAmt: 0,
       netPayment,
       settledCreditIds: creditIds,
       paid: true,
@@ -134,7 +153,7 @@ export async function POST(req: NextRequest) {
       grossPayment,
       groceryDeduction,
       fertiliserDeduction,
-      otherDeductionAmt,
+      transportCostTotal + stampCostTotal,
       netPayment
     ).catch(err => console.error('[SMS] Monthly payment SMS error:', err));
   }

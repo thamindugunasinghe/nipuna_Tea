@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
   // Calculate totals
   const totalGrossKilos = collections.reduce((sum, c) => sum + c.kilosByDriver, 0);
   const totalWaterDeduction = collections.reduce((sum, c) => sum + (c.waterDeduction || 0), 0);
-  const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
+  const totalPackagingDeduction = collections.reduce((sum, c) => sum + (c.packagingDeduction || 0), 0);
+  const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0) - (c.packagingDeduction || 0))), 0);
 
   // Check if a validation record already exists
   const existingValidation = await prisma.lorryValidation.findFirst({
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
     collections,
     totalGrossKilos,
     totalWaterDeduction,
+    totalPackagingDeduction,
     totalNetKilos,
     collectionsCount: collections.length,
     existingValidation,
@@ -86,21 +88,27 @@ export async function POST(req: NextRequest) {
 
   // Calculate totals
   const totalGrossKilos = collections.reduce((sum, c) => sum + c.kilosByDriver, 0);
-  const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0))), 0);
+  const totalNetKilos = collections.reduce((sum, c) => sum + (c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0) - (c.packagingDeduction || 0))), 0);
   const actualLorryScaleKilos = parseFloat(lorryScaleKilos);
 
   // The key difference: lorry scale vs cumulative net kilos (after water deduction)
   const lorryCumulativeDiff = Math.round((actualLorryScaleKilos - totalNetKilos) * 100) / 100;
 
   // Ensure all collections have kilosValidated set (for old data that might not have it)
-  for (const c of collections) {
+  const updates = collections.map(c => {
     if (c.kilosValidated == null) {
-      const netKilos = Math.round((c.kilosByDriver - (c.waterDeduction || 0)) * 100) / 100;
-      await prisma.teaCollection.update({
+      const netKilos = Math.round((c.kilosByDriver - (c.waterDeduction || 0) - (c.packagingDeduction || 0)) * 100) / 100;
+      c.kilosValidated = netKilos; // update local object too
+      return prisma.teaCollection.update({
         where: { id: c.id },
         data: { kilosValidated: netKilos },
       });
     }
+    return null;
+  }).filter((u): u is NonNullable<typeof u> => u !== null);
+
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
   }
 
   // Create/update validation record (now also works for warehouse)
@@ -141,7 +149,8 @@ export async function POST(req: NextRequest) {
     customerName: c.customer?.name,
     grossKilos: c.kilosByDriver,
     waterDeduction: c.waterDeduction || 0,
-    netKilos: c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0)),
+    packagingDeduction: c.packagingDeduction || 0,
+    netKilos: c.kilosValidated || (c.kilosByDriver - (c.waterDeduction || 0) - (c.packagingDeduction || 0)),
   }));
 
   return NextResponse.json({

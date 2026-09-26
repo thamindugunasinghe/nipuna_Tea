@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'OTP expired. Please request a new one. / OTP කල් ඉකුත්වී ඇත.' }, { status: 400 });
   }
 
-  if (otp !== stored.code) {
+  if (String(otp).trim() !== stored.code) {
     return NextResponse.json({ error: 'Invalid OTP. Please try again. / වැරදි OTP. නැවත උත්සාහ කරන්න.' }, { status: 400 });
   }
 

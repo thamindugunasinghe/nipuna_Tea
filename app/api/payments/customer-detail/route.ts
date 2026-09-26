@@ -41,13 +41,20 @@ export async function GET(req: NextRequest) {
   const priceSetting = await prisma.settings.findUnique({ where: { key: 'tea_price_per_kilo' } });
   const defaultPricePerKilo = priceSetting ? parseFloat(priceSetting.value) : 0;
 
-  // Get other deduction rate from settings
-  const deductionSetting = await prisma.settings.findUnique({ where: { key: 'other_deduction_rate' } });
-  const otherDeductionRate = deductionSetting ? parseFloat(deductionSetting.value) : 5;
+  // Get transport & stamp cost settings
+  const transportSetting = await prisma.settings.findUnique({ where: { key: 'transport_cost_per_kilo' } });
+  const stampSetting = await prisma.settings.findUnique({ where: { key: 'stamp_cost_per_kilo' } });
+  const transportCostPerKilo = transportSetting ? parseFloat(transportSetting.value) : 6;
+  const stampCostPerKilo = stampSetting ? parseFloat(stampSetting.value) : 0;
 
   // Calculate totals
   const totalValidatedKilos = collections
     .filter(c => c.kilosValidated != null)
+    .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+
+  // Lorry kilos (for transport cost — only collections with lorryId)
+  const lorryKilos = collections
+    .filter(c => c.kilosValidated != null && c.lorryId !== null)
     .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
 
   const totalPendingCredit = pendingCredits.reduce((sum, p) => sum + p.totalCost, 0);
@@ -62,8 +69,10 @@ export async function GET(req: NextRequest) {
     collections,
     pendingCredits,
     defaultPricePerKilo,
-    otherDeductionRate,
+    transportCostPerKilo,
+    stampCostPerKilo,
     totalValidatedKilos,
+    lorryKilos,
     totalPendingCredit,
     existingPayment,
   });

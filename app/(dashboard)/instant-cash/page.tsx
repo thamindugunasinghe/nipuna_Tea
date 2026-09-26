@@ -18,6 +18,8 @@ export default function InstantCashPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<any>(null);
   const [pricePerKilo, setPricePerKilo] = useState('');
+  const [transportCostPerKilo, setTransportCostPerKilo] = useState(0);
+  const [stampCostPerKilo, setStampCostPerKilo] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -37,8 +39,9 @@ export default function InstantCashPage() {
       const res = await fetch('/api/settings');
       if (res.ok) {
         const settings = await res.json();
-        const price = settings.find((s: any) => s.key === 'PRICE_PER_KILO')?.value || '';
-        setPricePerKilo(price);
+        setPricePerKilo(settings.tea_price_per_kilo || '');
+        setTransportCostPerKilo(parseFloat(settings.transport_cost_per_kilo) || 6);
+        setStampCostPerKilo(parseFloat(settings.stamp_cost_per_kilo) || 0);
       }
     } catch (e) {
       console.error(e);
@@ -72,7 +75,7 @@ export default function InstantCashPage() {
     setShowModal(true);
   };
 
-  const handlePrint = (collection: any, price: string) => {
+  const handlePrint = (collection: any, price: string, transportTotal: number, stampTotal: number, finalPayment: number) => {
     printReceipt({
       type: 'instant-cash',
       receiptNo: `CASH-${collection.id}`,
@@ -80,8 +83,22 @@ export default function InstantCashPage() {
       customerName: collection.customer?.name,
       totalKilos: collection.netKilos,
       pricePerKilo: parseFloat(price || '0'),
-      netPayment: collection.netKilos * (parseFloat(price || '0')),
+      transportDeduction: transportTotal,
+      stampDeduction: stampTotal,
+      netPayment: finalPayment,
     });
+  };
+
+  // Calculate costs for selected collection
+  const getPaymentBreakdown = (collection: any) => {
+    if (!collection) return { grossPay: 0, transportTotal: 0, stampTotal: 0, finalPayment: 0 };
+    const price = parseFloat(pricePerKilo) || 0;
+    const grossPay = collection.netKilos * price;
+    const isLorry = collection.lorryId !== null;
+    const transportTotal = isLorry ? Math.round(collection.netKilos * transportCostPerKilo * 100) / 100 : 0;
+    const stampTotal = Math.round(collection.netKilos * stampCostPerKilo * 100) / 100;
+    const finalPayment = Math.max(0, grossPay - transportTotal - stampTotal);
+    return { grossPay, transportTotal, stampTotal, finalPayment };
   };
 
   const handleProcessPayment = async () => {
@@ -101,7 +118,8 @@ export default function InstantCashPage() {
       if (res.ok) {
         showToast('Payment processed successfully!', 'success');
         setShowModal(false);
-        handlePrint(selectedCollection, pricePerKilo);
+        const breakdown = getPaymentBreakdown(selectedCollection);
+        handlePrint(selectedCollection, pricePerKilo, breakdown.transportTotal, breakdown.stampTotal, breakdown.finalPayment);
         fetchCollections();
       } else {
         const err = await res.json();
@@ -219,7 +237,10 @@ export default function InstantCashPage() {
                         <CheckCircle size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
                         Completed
                       </span>
-                      <button className="btn btn-secondary btn-sm" onClick={() => handlePrint(c, pricePerKilo || '0')}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => {
+                        const b = getPaymentBreakdown(c);
+                        handlePrint(c, pricePerKilo || '0', b.transportTotal, b.stampTotal, b.finalPayment);
+                      }}>
                         <Printer size={14} />
                       </button>
                     </div>
@@ -244,6 +265,10 @@ export default function InstantCashPage() {
                 <span style={{ color: 'var(--gray-500)' }}>Net Kilos:</span>
                 <strong style={{ fontSize: '16px', color: 'var(--primary-700)' }}>{selectedCollection.netKilos} kg</strong>
               </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--gray-500)' }}>Collection Type:</span>
+                <strong>{selectedCollection.lorryId ? 'Lorry / ලොරි' : 'Warehouse / ගබඩාව'}</strong>
+              </div>
             </div>
 
             <div className="form-group">
@@ -255,15 +280,40 @@ export default function InstantCashPage() {
                 value={pricePerKilo}
                 onChange={(e) => setPricePerKilo(e.target.value)}
               />
-              <span className="form-hint">Defaults to the global price per kilo in Settings, but can be changed.</span>
             </div>
 
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
-              <span style={{ color: '#16a34a', fontSize: '14px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Total Amount to Pay</span>
-              <span style={{ color: '#15803d', fontSize: '28px', fontWeight: 800 }}>
-                Rs. {(selectedCollection.netKilos * (parseFloat(pricePerKilo) || 0)).toLocaleString()}
-              </span>
-            </div>
+            {/* Deduction Breakdown */}
+            {(() => {
+              const { grossPay, transportTotal, stampTotal, finalPayment } = getPaymentBreakdown(selectedCollection);
+              return (
+                <>
+                  <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span>Gross Payment / දළ ගෙවීම:</span>
+                      <strong>Rs. {grossPay.toLocaleString()}</strong>
+                    </div>
+                    {transportTotal > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#dc2626' }}>
+                        <span>Transport Cost ({transportCostPerKilo}/kg):</span>
+                        <span>- Rs. {transportTotal.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {stampTotal > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: '#dc2626' }}>
+                        <span>Stamp Cost ({stampCostPerKilo}/kg):</span>
+                        <span>- Rs. {stampTotal.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
+                    <span style={{ color: '#16a34a', fontSize: '14px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Total Amount to Pay / ගෙවීමට මුදල</span>
+                    <span style={{ color: '#15803d', fontSize: '28px', fontWeight: 800 }}>
+                      Rs. {finalPayment.toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
               <button className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={submitting}>Cancel</button>

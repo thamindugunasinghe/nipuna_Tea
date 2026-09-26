@@ -115,8 +115,9 @@ model TeaCollection {
   driverId       Int?     @map("driver_id")
   lorryId        Int?     @map("lorry_id")
   kilosByDriver  Float    @map("kilos_by_driver")
-  waterDeduction Float    @default(0) @map("water_deduction") // manual kg deduction by rider
-  kilosValidated Float?   @map("kilos_validated")
+  waterDeduction     Float    @default(0) @map("water_deduction") // manual kg deduction by rider
+  packagingDeduction Float    @default(0) @map("packaging_deduction") // manual kg deduction for crates/bags
+  kilosValidated     Float?   @map("kilos_validated")
   instantPaid    Boolean  @default(false) @map("instant_paid")
   instantPaidAt  DateTime? @map("instant_paid_at")
   waterScore     Int      @default(0) @map("water_score") // DEPRECATED - kept for old data
@@ -161,8 +162,12 @@ model MonthlyPayment {
   grossPayment        Float    @map("gross_payment")
   groceryDeduction    Float    @default(0) @map("grocery_deduction")
   fertiliserDeduction Float    @default(0) @map("fertiliser_deduction")
-  otherDeductionPct   Float    @default(0) @map("other_deduction_pct")
-  otherDeductionAmt   Float    @default(0) @map("other_deduction_amt")
+  transportCostPerKilo Float   @default(0) @map("transport_cost_per_kilo")
+  transportCostTotal  Float    @default(0) @map("transport_cost_total")
+  stampCostPerKilo    Float    @default(0) @map("stamp_cost_per_kilo")
+  stampCostTotal      Float    @default(0) @map("stamp_cost_total")
+  otherDeductionPct   Float    @default(0) @map("other_deduction_pct") // DEPRECATED - kept for old data
+  otherDeductionAmt   Float    @default(0) @map("other_deduction_amt") // DEPRECATED - kept for old data
   netPayment          Float    @map("net_payment")
   settledCreditIds    Json?    @map("settled_credit_ids")
   paid                Boolean  @default(false)

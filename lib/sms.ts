@@ -68,12 +68,12 @@ export async function sendCollectionSms(
   customerName: string,
   phone: string,
   kilos: number,
-  waterDeduction: number,
+  totalDeduction: number,
   netKilos: number,
   date: string
 ): Promise<void> {
-  const deductionLine = waterDeduction > 0
-    ? `\nWater Ded: -${waterDeduction}kg`
+  const deductionLine = totalDeduction > 0
+    ? `\nDeductions: -${totalDeduction}kg`
     : '';
   const message =
     `NIPUNA TEA\n` +
@@ -156,7 +156,7 @@ export async function sendMonthlyPaymentSms(
   grossPayment: number,
   groceryDeduction: number,
   fertiliserDeduction: number,
-  otherDeductionAmt: number,
+  transAndStampAmt: number,
   netPayment: number
 ): Promise<void> {
   let deductions = '';
@@ -166,8 +166,8 @@ export async function sendMonthlyPaymentSms(
   if (fertiliserDeduction > 0) {
     deductions += `\nFertiliser: -Rs.${fertiliserDeduction.toLocaleString()}`;
   }
-  if (otherDeductionAmt > 0) {
-    deductions += `\nOther: -Rs.${Math.round(otherDeductionAmt).toLocaleString()}`;
+  if (transAndStampAmt > 0) {
+    deductions += `\nTrans/Stamp: -Rs.${Math.round(transAndStampAmt).toLocaleString()}`;
   }
 
   const message =

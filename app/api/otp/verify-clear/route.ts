@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'OTP has expired. Please request a new one.' }, { status: 400 });
   }
 
-  if (otp !== stored.code) {
+  if (String(otp).trim() !== stored.code) {
     return NextResponse.json({ error: 'Invalid OTP. Please try again.' }, { status: 400 });
   }
 

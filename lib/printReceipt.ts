@@ -12,8 +12,10 @@ interface ReceiptData {
   grossPayment?: number;
   groceryDeduction?: number;
   fertiliserDeduction?: number;
-  otherDeduction?: number;
-  otherDeductionPct?: number;
+  transportDeduction?: number;
+  stampDeduction?: number;
+  transportCostPerKilo?: number;
+  stampCostPerKilo?: number;
   netPayment?: number;
   month?: string;
   year?: number;
@@ -136,10 +138,16 @@ export function printReceipt(data: ReceiptData) {
           <td class="label-cell">Fertiliser / පොහොර</td>
           <td class="value-cell deduct">- Rs. ${data.fertiliserDeduction?.toLocaleString()}</td>
         </tr>
+        ${data.transportDeduction ? `
         <tr>
-          <td class="label-cell">Other (${data.otherDeductionPct || 5}%) / වෙනත්</td>
-          <td class="value-cell deduct">- Rs. ${data.otherDeduction?.toLocaleString()}</td>
-        </tr>
+          <td class="label-cell">Transport (${data.transportCostPerKilo}/kg) / ප්‍රවාහන</td>
+          <td class="value-cell deduct">- Rs. ${data.transportDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
+        ${data.stampDeduction ? `
+        <tr>
+          <td class="label-cell">Stamp (${data.stampCostPerKilo}/kg) / මුද්දර</td>
+          <td class="value-cell deduct">- Rs. ${data.stampDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
       </table>
 
       <div class="divider thick"></div>
@@ -177,10 +185,6 @@ export function printReceipt(data: ReceiptData) {
         <tr>
           <td class="label-cell">Price per Kilo / කිලෝ මිල</td>
           <td class="value-cell">Rs. ${data.pricePerKilo?.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td class="label-cell">Commission Rate / අනුපාතය</td>
-          <td class="value-cell">${data.commissionRate}%</td>
         </tr>
       </table>
 
@@ -263,6 +267,16 @@ export function printReceipt(data: ReceiptData) {
           <td class="label-cell">Price per Kilo / කිලෝ මිල</td>
           <td class="value-cell">Rs. ${data.pricePerKilo?.toLocaleString()}</td>
         </tr>
+        ${data.transportDeduction ? `
+        <tr>
+          <td class="label-cell">Transport / ප්‍රවාහන</td>
+          <td class="value-cell deduct">- Rs. ${data.transportDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
+        ${data.stampDeduction ? `
+        <tr>
+          <td class="label-cell">Stamp / මුද්දර</td>
+          <td class="value-cell deduct">- Rs. ${data.stampDeduction?.toLocaleString()}</td>
+        </tr>` : ''}
       </table>
 
       <div class="divider thick"></div>

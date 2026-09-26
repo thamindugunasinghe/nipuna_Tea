@@ -221,9 +221,9 @@ export default function ValidationPage() {
                     <div className="stat-card">
                       <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}><Droplets size={24} /></div>
                       <div className="stat-content">
-                        <h3>Water Deduction / ජල අඩු කිරීම</h3>
-                        <div className="stat-value" style={{ color: '#dc2626' }}>- {data.totalWaterDeduction.toLocaleString()}</div>
-                        <div className="stat-sub">kg deducted by rider</div>
+                        <h3>Deductions / අඩු කිරීම්</h3>
+                        <div className="stat-value" style={{ color: '#dc2626' }}>- {(data.totalWaterDeduction + (data.totalPackagingDeduction || 0)).toLocaleString()}</div>
+                        <div className="stat-sub">Water: {data.totalWaterDeduction}kg | Pack: {data.totalPackagingDeduction || 0}kg</div>
                       </div>
                     </div>
                     <div className="stat-card">
@@ -249,14 +249,16 @@ export default function ValidationPage() {
                             <th>Customer</th>
                             <th>Driver</th>
                             <th>Gross Kilos</th>
-                            <th style={{ color: '#dc2626' }}>Water Deduction</th>
+                            <th style={{ color: '#dc2626' }}>Deductions (Water + Pkg)</th>
                             <th>Net Kilos</th>
                           </tr>
                         </thead>
                         <tbody>
                           {data.collections.map((c: any, i: number) => {
-                            const deduction = c.waterDeduction || 0;
-                            const netKilos = c.kilosValidated ?? (c.kilosByDriver - deduction);
+                            const water = c.waterDeduction || 0;
+                            const pack = c.packagingDeduction || 0;
+                            const totalDeduct = water + pack;
+                            const netKilos = c.kilosValidated ?? (c.kilosByDriver - totalDeduct);
                             return (
                               <tr key={c.id}>
                                 <td>{i + 1}</td>
@@ -264,7 +266,7 @@ export default function ValidationPage() {
                                 <td>{c.driver?.name || '-'}</td>
                                 <td>{c.kilosByDriver} kg</td>
                                 <td style={{ color: '#dc2626', fontWeight: 600 }}>
-                                  {deduction > 0 ? `- ${deduction} kg` : '—'}
+                                  {totalDeduct > 0 ? `- ${totalDeduct} kg` : '—'}
                                 </td>
                                 <td>
                                   <span className="badge badge-green">
@@ -295,13 +297,13 @@ export default function ValidationPage() {
                       </div>
                     </div>
 
-                    {/* Water Deduction Total */}
+                    {/* Deductions Total */}
                     <div className="stat-card">
                       <div className="stat-icon" style={{ background: '#fee2e2', color: '#dc2626' }}><Droplets size={24} /></div>
                       <div className="stat-content">
-                        <h3>Water Deduction / ජල අඩු කිරීම</h3>
-                        <div className="stat-value" style={{ color: '#dc2626' }}>- {data.totalWaterDeduction.toLocaleString()}</div>
-                        <div className="stat-sub">kg deducted by rider</div>
+                        <h3>Deductions / අඩු කිරීම්</h3>
+                        <div className="stat-value" style={{ color: '#dc2626' }}>- {(data.totalWaterDeduction + (data.totalPackagingDeduction || 0)).toLocaleString()}</div>
+                        <div className="stat-sub">Water: {data.totalWaterDeduction}kg | Pack: {data.totalPackagingDeduction || 0}kg</div>
                       </div>
                     </div>
 
@@ -371,14 +373,16 @@ export default function ValidationPage() {
                             <th>Customer</th>
                             <th>Driver</th>
                             <th>Gross Kilos</th>
-                            <th style={{ color: '#dc2626' }}>Water Deduction</th>
+                            <th style={{ color: '#dc2626' }}>Deductions (W+P)</th>
                             <th>Net Kilos</th>
                           </tr>
                         </thead>
                         <tbody>
                           {data.collections.map((c: any, i: number) => {
-                            const deduction = c.waterDeduction || 0;
-                            const netKilos = c.kilosValidated ?? (c.kilosByDriver - deduction);
+                            const water = c.waterDeduction || 0;
+                            const pack = c.packagingDeduction || 0;
+                            const totalDeduct = water + pack;
+                            const netKilos = c.kilosValidated ?? (c.kilosByDriver - totalDeduct);
                             return (
                               <tr key={c.id}>
                                 <td>{i + 1}</td>
@@ -386,7 +390,7 @@ export default function ValidationPage() {
                                 <td>{c.driver?.name || '-'}</td>
                                 <td>{c.kilosByDriver} kg</td>
                                 <td style={{ color: '#dc2626', fontWeight: 600 }}>
-                                  {deduction > 0 ? `- ${deduction} kg` : '—'}
+                                  {totalDeduct > 0 ? `- ${totalDeduct} kg` : '—'}
                                 </td>
                                 <td>
                                   <span className="badge badge-green">
@@ -402,7 +406,7 @@ export default function ValidationPage() {
                           <tr style={{ fontWeight: 700, background: 'var(--gray-50)' }}>
                             <td colSpan={3}>Total</td>
                             <td>{data.totalGrossKilos} kg</td>
-                            <td style={{ color: '#dc2626' }}>- {data.totalWaterDeduction} kg</td>
+                            <td style={{ color: '#dc2626' }}>- {data.totalWaterDeduction + (data.totalPackagingDeduction || 0)} kg</td>
                             <td style={{ color: 'var(--primary-700)' }}>
                               {data.totalNetKilos.toLocaleString()} kg
                             </td>
@@ -421,12 +425,12 @@ export default function ValidationPage() {
                       <AlertTriangle size={16} />
                       <strong>How it works / ක්‍රියා කරන ආකාරය</strong>
                     </div>
-                    <p>Net kilos for each customer = Gross kilos − Water deduction (entered by rider).
-                      The lorry scale weight is compared with the cumulative gross total to find any difference.
+                    <p>Net kilos for each customer = Gross kilos − (Water + Packaging deduction).
+                      The lorry scale weight is compared with the cumulative net total to find any difference.
                       This difference is saved for reports only — customer payments are based on their net kilos.</p>
                     <p style={{ marginTop: '4px' }}>
-                      සෑම ගනුදෙනුකරුවෙකුටම ශුද්ධ කිලෝ = මුළු බර − ජල අඩු කිරීම (රියදුරු විසින් ඇතුළත් කළ).
-                      ලොරි කිරුම බර සමස්ත මුළු බර සමඟ සංසන්දනය කරනු ලැබේ.
+                      සෑම ගනුදෙනුකරුවෙකුටම ශුද්ධ කිලෝ = මුළු බර − (ජල + ඇසුරුම් අඩු කිරීම).
+                      ලොරි කිරුම බර සමස්ත ශුද්ධ බර සමඟ සංසන්දනය කරනු ලැබේ.
                     </p>
                   </div>
 

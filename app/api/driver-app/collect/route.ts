@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 // POST: Record a tea collection
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { driverId, lorryId, customerId, kilosByDriver, waterDeduction } = body;
+  const { driverId, lorryId, customerId, kilosByDriver, waterDeduction, packagingDeduction } = body;
 
   if (!driverId || !customerId || !kilosByDriver) {
     return NextResponse.json({ error: 'driverId, customerId, and kilosByDriver are required' }, { status: 400 });
@@ -49,12 +49,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid kilos value' }, { status: 400 });
   }
 
-  const deduction = parseFloat(waterDeduction) || 0;
-  if (deduction < 0 || deduction >= kilos) {
-    return NextResponse.json({ error: 'Water deduction must be >= 0 and less than kilos / ජල අඩු කිරීම 0 ට වැඩි සහ කිලෝ වලට වඩා අඩු විය යුතුය' }, { status: 400 });
+  const waterDed = parseFloat(waterDeduction) || 0;
+  const packDed = parseFloat(packagingDeduction) || 0;
+  const totalDeduction = waterDed + packDed;
+
+  if (waterDed < 0 || packDed < 0 || totalDeduction >= kilos) {
+    return NextResponse.json({ error: 'Deductions must be >= 0 and less than kilos / අඩු කිරීම් 0 ට වැඩි සහ කිලෝ වලට වඩා අඩු විය යුතුය' }, { status: 400 });
   }
 
-  const netKilos = Math.round((kilos - deduction) * 100) / 100;
+  const netKilos = Math.round((kilos - totalDeduction) * 100) / 100;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -75,7 +78,8 @@ export async function POST(req: NextRequest) {
       driverId,
       lorryId: lorryId || null,
       kilosByDriver: kilos,
-      waterDeduction: deduction,
+      waterDeduction: waterDed,
+      packagingDeduction: packDed,
       kilosValidated: netKilos,
       collectionDate: today,
       month: today.getMonth() + 1,
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  console.log(`[COLLECT] Driver ${driverId} collected ${kilos}kg (deduction: ${deduction}kg, net: ${netKilos}kg) from customer ${customerId}`);
+  console.log(`[COLLECT] Driver ${driverId} collected ${kilos}kg (deduction: ${totalDeduction}kg, net: ${netKilos}kg) from customer ${customerId}`);
 
   // Send SMS notification (async, non-blocking)
   if (collection.customer?.phone) {
@@ -102,7 +106,7 @@ export async function POST(req: NextRequest) {
       collection.customer.name,
       collection.customer.phone,
       kilos,
-      deduction,
+      totalDeduction,
       netKilos,
       today.toISOString().split('T')[0]
     ).catch(err => console.error('[SMS] Driver collection SMS error:', err));

@@ -27,7 +27,6 @@ export default function CommissionsPage() {
   const [startDate, setStartDate] = useState(defaultRange.startDate);
   const [endDate, setEndDate] = useState(defaultRange.endDate);
   const [pricePerKilo, setPricePerKilo] = useState('');
-  const [commissionRate, setCommissionRate] = useState('5');
 
   // Derive month/year from start date for API calls
   const month = new Date(startDate).getMonth() + 1;
@@ -51,7 +50,7 @@ export default function CommissionsPage() {
       const res = await fetch('/api/commissions/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, year, pricePerKilo: parseFloat(pricePerKilo), commissionRate: parseFloat(commissionRate) }),
+        body: JSON.stringify({ month, year, pricePerKilo: parseFloat(pricePerKilo) }),
       });
       if (res.ok) { showToast(t('commissions.calculateSuccess'), 'success'); fetchCommissions(); }
       else showToast(t('common.error'), 'error');
@@ -76,7 +75,6 @@ export default function CommissionsPage() {
       driverName: c.driver?.name,
       totalKilos: c.totalKilos,
       pricePerKilo: c.pricePerKilo,
-      commissionRate: c.commissionRate,
       commissionAmount: c.commissionAmount,
       month: months[month - 1],
       year: year,
@@ -104,15 +102,10 @@ export default function CommissionsPage() {
               <label className="form-label">{t('payments.pricePerKilo')}</label>
               <input type="number" step="0.01" className="form-input" value={pricePerKilo} onChange={(e) => setPricePerKilo(e.target.value)} />
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{t('commissions.commissionRate')}</label>
-              <input type="number" step="0.1" className="form-input" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} />
-            </div>
             <button className="btn btn-primary" onClick={handleCalculate} disabled={calculating}>
               <Calculator size={18} /> {calculating ? t('common.loading') : t('commissions.calculateCommissions')}
             </button>
           </div>
-          <p className="form-help" style={{ marginTop: '12px' }}>{t('commissions.formula')}</p>
         </div>
       </div>
 
@@ -125,7 +118,6 @@ export default function CommissionsPage() {
                 <th>{t('collections.driver')}</th>
                 <th>{t('commissions.totalKilos')}</th>
                 <th>{t('payments.pricePerKilo')}</th>
-                <th>{t('commissions.commissionRate')}</th>
                 <th>{t('commissions.commissionAmount')}</th>
                 <th>{t('common.status')}</th>
                 <th>{t('common.actions')}</th>
@@ -140,7 +132,6 @@ export default function CommissionsPage() {
                   <td style={{ fontWeight: 600 }}>{c.driver?.name}</td>
                   <td>{c.totalKilos.toLocaleString()} {t('common.kg')}</td>
                   <td>{t('common.rs')} {c.pricePerKilo}</td>
-                  <td>{c.commissionRate}%</td>
                   <td className="amount amount-positive">{t('common.rs')} {c.commissionAmount.toLocaleString()}</td>
                   <td><span className={`badge ${c.paid ? 'badge-green' : 'badge-amber'}`}>{c.paid ? t('common.paid') : t('common.unpaid')}</span></td>
                   <td style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
