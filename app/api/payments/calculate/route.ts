@@ -4,7 +4,7 @@ import { sendMonthlyPaymentSms } from '@/lib/sms';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { customerId, month, year, startDate, endDate, pricePerKilo, settledCreditIds, settledCollectionIds } = body;
+  const { customerId, month, year, startDate, endDate, pricePerKilo, settledCreditIds, settledCollectionIds, shortfallAction } = body;
 
   if (!customerId || !month || !year || !pricePerKilo) {
     return NextResponse.json(
@@ -89,6 +89,15 @@ export async function POST(req: NextRequest) {
   const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction + transportCostTotal + stampCostTotal + otherDeductionAmt;
   const netPayment = Math.max(0, grossPayment - totalDeductions);
 
+  const availableForDeduction = Math.max(0, grossPayment - transportCostTotal - stampCostTotal - otherDeductionAmt);
+  const creditDeductionRequested = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction;
+  const shortfall = Math.max(0, creditDeductionRequested - availableForDeduction);
+  
+  let cashReceived = 0;
+  if (shortfall > 0 && shortfallAction === 'cash') {
+    cashReceived = shortfall;
+  }
+
   // Accumulate with existing payment if it exists
   const existingPayment = await prisma.monthlyPayment.findUnique({
     where: { customerId_month_year: { customerId, month, year } }
@@ -112,6 +121,7 @@ export async function POST(req: NextRequest) {
       stampCostTotal: { increment: stampCostTotal },
       otherDeductionAmt: { increment: otherDeductionAmt },
       netPayment: { increment: netPayment },
+      cashReceived: { increment: cashReceived },
       settledCreditIds: mergedCreditIds,
       paid: true,
       paidAt: new Date(),
@@ -133,6 +143,7 @@ export async function POST(req: NextRequest) {
       otherDeductionPct,
       otherDeductionAmt,
       netPayment,
+      cashReceived,
       settledCreditIds: mergedCreditIds,
       paid: true,
       paidAt: new Date(),
@@ -145,6 +156,30 @@ export async function POST(req: NextRequest) {
     await prisma.creditPurchase.updateMany({
       where: { id: { in: creditIds }, customerId },
       data: { settled: true, monthlyPaymentId: payment.id },
+    });
+  }
+
+  // If carry forward, create a new credit purchase for the shortfall
+  if (shortfall > 0 && shortfallAction === 'carry_forward') {
+    // Next month calculation
+    let nextMonth = month + 1;
+    let nextYear = year;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear += 1;
+    }
+    await prisma.creditPurchase.create({
+      data: {
+        customerId,
+        itemType: 'cash_advance',
+        description: 'Brought forward from previous month',
+        quantity: 1,
+        unitPrice: shortfall,
+        totalCost: shortfall,
+        month: nextMonth,
+        year: nextYear,
+        settled: false,
+      }
     });
   }
 
@@ -174,7 +209,9 @@ export async function POST(req: NextRequest) {
       fertiliserDeduction,
       cashAdvanceDeduction,
       transportCostTotal + stampCostTotal + otherDeductionAmt,
-      netPayment
+      netPayment,
+      cashReceived,
+      shortfall > 0 && shortfallAction === 'carry_forward' ? shortfall : 0
     ).catch(err => console.error('[SMS] Monthly payment SMS error:', err));
   }
 

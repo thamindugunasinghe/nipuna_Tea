@@ -29,6 +29,7 @@ export default function CustomersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [form, setForm] = useState({ name: '', nic: '', phone: '', address: '', type: 'regular' });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { fetchCustomers(); }, []);
 
@@ -53,6 +54,7 @@ export default function CustomersPage() {
   };
 
   const handleSave = async () => {
+    setSubmitting(true);
     try {
       const method = editCustomer ? 'PUT' : 'POST';
       const url = editCustomer ? `/api/customers/${editCustomer.id}` : '/api/customers';
@@ -72,6 +74,7 @@ export default function CustomersPage() {
     } catch (e) {
       showToast(t('common.error'), 'error');
     }
+    setSubmitting(false);
   };
 
   const handleDelete = async (id: number) => {
@@ -182,8 +185,10 @@ export default function CustomersPage() {
         title={editCustomer ? t('customers.editCustomer') : t('customers.addCustomer')}
         footer={
           <>
-            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-            <button className="btn btn-primary" onClick={handleSave}>{t('common.save')}</button>
+            <button className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={submitting}>{t('common.cancel')}</button>
+            <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
+              {submitting ? 'Saving...' : t('common.save')}
+            </button>
           </>
         }
       >

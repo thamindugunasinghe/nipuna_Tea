@@ -173,6 +173,7 @@ model MonthlyPayment {
   otherDeductionPct   Float    @default(0) @map("other_deduction_pct") // DEPRECATED - kept for old data
   otherDeductionAmt   Float    @default(0) @map("other_deduction_amt") // DEPRECATED - kept for old data
   netPayment          Float    @map("net_payment")
+  cashReceived        Float    @default(0) @map("cash_received")
   settledCreditIds    Json?    @map("settled_credit_ids")
   paid                Boolean  @default(false)
   paidAt              DateTime? @map("paid_at")

@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
 
     const unpaidCredit = customer.creditPurchases.reduce((sum, p) => sum + p.totalCost, 0);
 
-    const isPending = unpaidKilos > 0 || unpaidCredit > 0;
+    const isPending = unpaidKilos > 0;
 
     const totalKilos = rangeKilos;
     const totalPendingCredit = unpaidCredit;

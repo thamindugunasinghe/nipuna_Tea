@@ -33,6 +33,7 @@ export default function PurchasesPage() {
   // Multi-fertiliser items list
   const [fertItems, setFertItems] = useState<FertiliserItem[]>([]);
   const [fertForm, setFertForm] = useState({ fertiliserId: '', quantity: '1' });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -78,6 +79,7 @@ export default function PurchasesPage() {
   };
 
   const handleAdd = async () => {
+    setSubmitting(true);
     try {
       if (form.itemType === 'fertiliser') {
         // Batch add all fertiliser items
@@ -139,6 +141,7 @@ export default function PurchasesPage() {
         }
       }
     } catch (e) { showToast(t('common.error'), 'error'); }
+    setSubmitting(false);
   };
 
   const resetForm = () => {
@@ -251,8 +254,12 @@ export default function PurchasesPage() {
                 <td>{p.description || '-'}</td>
                 <td>{p.quantity}</td>
                 <td>{t('common.rs')} {p.unitPrice?.toLocaleString()}</td>
-                <td className="amount">{t('common.rs')} {p.totalCost?.toLocaleString()}</td>
-                <td><span className={`badge ${p.settled ? 'badge-green' : 'badge-amber'}`}>{p.settled ? t('common.settled') : t('common.pending')}</span></td>
+                <td className="amount amount-negative" style={{ color: '#dc2626', fontWeight: 600 }}>{t('common.rs')} {p.totalCost?.toLocaleString()}</td>
+                <td>
+                  <span className={`badge ${p.settled ? 'badge-green' : (p.description?.includes('Brought forward') ? 'badge-blue' : 'badge-amber')}`}>
+                    {p.settled ? t('common.settled') : (p.description?.includes('Brought forward') ? 'Rolled Over' : t('common.pending'))}
+                  </span>
+                </td>
                 <td>
                   <button className="btn btn-sm btn-outline" onClick={() => handlePrint(p)} title="Print Receipt">
                     <Printer size={14} /> Print
@@ -265,8 +272,8 @@ export default function PurchasesPage() {
       </div>
 
       <Modal isOpen={showModal} onClose={() => { setShowModal(false); resetForm(); }} title={t('purchases.addPurchase')}
-        footer={<><button className="btn btn-secondary" onClick={() => { setShowModal(false); resetForm(); }}>{t('common.cancel')}</button>
-          <button className="btn btn-primary" onClick={handleAdd}>{t('common.save')}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => { setShowModal(false); resetForm(); }} disabled={submitting}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={handleAdd} disabled={submitting}>{submitting ? 'Saving...' : t('common.save')}</button></>}>
         <div className="form-group">
           <CustomerSearch
             customers={regularCustomers}

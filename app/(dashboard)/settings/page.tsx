@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [fertForm, setFertForm] = useState({ name: '', pricePerUnit: '', weightPerBag: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   // Clear Data OTP states
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -39,6 +40,7 @@ export default function SettingsPage() {
   }, []);
 
   const saveSettings = async () => {
+    setSubmitting(true);
     try {
       await fetch('/api/settings', {
         method: 'PUT',
@@ -47,9 +49,11 @@ export default function SettingsPage() {
       });
       showToast(t('settings.saveSuccess'), 'success');
     } catch (e) { showToast(t('common.error'), 'error'); }
+    setSubmitting(false);
   };
 
   const addFertiliser = async () => {
+    setSubmitting(true);
     try {
       const res = await fetch('/api/fertilisers', {
         method: 'POST',
@@ -67,6 +71,7 @@ export default function SettingsPage() {
         setFertForm({ name: '', pricePerUnit: '', weightPerBag: '' });
       }
     } catch (e) { showToast(t('common.error'), 'error'); }
+    setSubmitting(false);
   };
 
   const deleteFertiliser = async (id: number) => {
@@ -167,7 +172,9 @@ export default function SettingsPage() {
                 <span className="form-hint">For billing & stamps, applies to all / බිල්පත් හා මුද්දර, සියල්ලටම අදාළ</span>
               </div>
             </div>
-            <button className="btn btn-primary" onClick={saveSettings}><Save size={18} /> {t('common.save')}</button>
+            <button className="btn btn-primary" onClick={saveSettings} disabled={submitting}>
+              {submitting ? 'Saving...' : <><Save size={18} /> {t('common.save')}</>}
+            </button>
           </div>
         </div>
 
@@ -227,8 +234,8 @@ export default function SettingsPage() {
 
       {/* Fertiliser Modal */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={t('settings.addFertiliser')}
-        footer={<><button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-          <button className="btn btn-primary" onClick={addFertiliser}>{t('common.save')}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={submitting}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={addFertiliser} disabled={submitting}>{submitting ? 'Saving...' : t('common.save')}</button></>}>
         <div className="form-group">
           <label className="form-label">{t('settings.fertiliserName')} *</label>
           <input className="form-input" value={fertForm.name} onChange={(e) => setFertForm({ ...fertForm, name: e.target.value })} />

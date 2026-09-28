@@ -202,9 +202,11 @@ export default function PaymentsPage() {
                     )}
                   </td>
                   <td>
-                    <span className={`badge ${c.payment?.paid ? 'badge-green' : 'badge-amber'}`}>
+                    <span className={`badge ${c.payment?.paid ? 'badge-green' : (c.totalKilos === 0 ? 'badge-gray' : 'badge-amber')}`}>
                       {c.payment?.paid ? (
                         <><CheckCircle size={12} style={{ marginRight: 4 }} /> Paid</>
+                      ) : c.totalKilos === 0 ? (
+                        <>No Tea</>
                       ) : (
                         <><Clock size={12} style={{ marginRight: 4 }} /> Pending</>
                       )}
@@ -223,6 +225,7 @@ export default function PaymentsPage() {
                     <button
                       className="btn btn-sm btn-primary"
                       onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }}
+                      disabled={!c.payment?.paid && c.totalKilos === 0}
                     >
                       <DollarSign size={14} />
                       {c.payment?.paid ? 'View' : 'Pay'}

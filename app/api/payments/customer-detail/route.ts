@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   let finalCollections = collections;
   let finalPendingCredits = pendingCredits;
 
-  const isPending = collections.length > 0 || pendingCredits.length > 0;
+  const isPending = collections.length > 0;
 
   if (existingPayment && !isPending) {
     finalCollections = existingPayment.settledCollections;

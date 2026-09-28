@@ -23,6 +23,8 @@ interface ReceiptData {
   year?: number;
   collections?: any[];
   settledCredits?: any[];
+  shortfallAmount?: number;
+  shortfallAction?: 'carry_forward' | 'cash';
   // Commission
   driverName?: string;
   commissionRate?: number;
@@ -81,7 +83,7 @@ export function printReceipt(data: ReceiptData) {
           ${data.settledCredits.map(c => `
             <tr>
               <td class="label-cell" style="font-size:11px">${new Date(c.purchaseDate).toLocaleDateString()}</td>
-              <td class="label-cell" style="font-size:11px">${c.description || c.fertiliser?.name || (c.itemType === 'grocery' ? 'Grocery' : 'Fertiliser')}</td>
+              <td class="label-cell" style="font-size:11px">${c.description || c.fertiliser?.name || (c.itemType === 'grocery' ? 'Grocery' : c.itemType === 'cash_advance' ? 'Cash Advance' : 'Fertiliser')}</td>
               <td class="value-cell deduct" style="font-size:11px">- Rs. ${c.totalCost.toLocaleString()}</td>
             </tr>
           `).join('')}
@@ -132,19 +134,6 @@ export function printReceipt(data: ReceiptData) {
       ${creditsHtml}
 
       <table>
-        <tr>
-          <td class="label-cell">Grocery / සිල්ලර බඩු</td>
-          <td class="value-cell deduct">- Rs. ${data.groceryDeduction?.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td class="label-cell">Fertiliser / පොහොර</td>
-          <td class="value-cell deduct">- Rs. ${data.fertiliserDeduction?.toLocaleString()}</td>
-        </tr>
-        ${data.cashAdvanceDeduction ? `
-        <tr>
-          <td class="label-cell">Cash Advance / අත්තිකාරම්</td>
-          <td class="value-cell deduct">- Rs. ${data.cashAdvanceDeduction?.toLocaleString()}</td>
-        </tr>` : ''}
         ${data.transportDeduction ? `
         <tr>
           <td class="label-cell">Transport (${data.transportCostPerKilo}/kg) / ප්‍රවාහන</td>
@@ -161,6 +150,24 @@ export function printReceipt(data: ReceiptData) {
           <td class="value-cell deduct">- Rs. ${data.otherDeduction?.toLocaleString()}</td>
         </tr>` : ''}
       </table>
+
+      ${data.shortfallAmount && data.shortfallAmount > 0 ? `
+      <div class="divider dashed"></div>
+      <div class="section-title" style="color: #b45309;">Credit Shortfall / ණය හිඟය</div>
+      <table>
+        <tr>
+          <td class="label-cell" style="color: #92400e;">Shortfall Amount / හිඟ මුදල</td>
+          <td class="value-cell" style="color: #92400e; font-weight: 700;">Rs. ${data.shortfallAmount.toLocaleString()}</td>
+        </tr>
+        <tr>
+          <td class="label-cell" colspan="2" style="color: #b45309; padding-top: 4px;">
+            ${data.shortfallAction === 'carry_forward' 
+              ? '▶ Carried forward to next month (Create new credit) / ඊළඟ මාසයට ගෙන යන ලදී' 
+              : '▶ Settled with cash (Customer paid by hand) / අතින් ගෙවා පියවන ලදී'}
+          </td>
+        </tr>
+      </table>
+      ` : ''}
 
       <div class="divider thick"></div>
 
@@ -222,7 +229,7 @@ export function printReceipt(data: ReceiptData) {
       </div>
       <div class="info-row">
         <span class="label">Type / වර්ගය:</span>
-        <span class="value">${data.itemType === 'grocery' ? 'Grocery / සිල්ලර බඩු' : 'Fertiliser / පොහොර'}</span>
+        <span class="value">${data.itemType === 'grocery' ? 'Grocery / සිල්ලර බඩු' : data.itemType === 'cash_advance' ? 'Cash Advance / අත්තිකාරම් මුදල්' : 'Fertiliser / පොහොර'}</span>
       </div>
 
       <div class="divider"></div>

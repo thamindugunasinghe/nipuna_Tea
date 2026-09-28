@@ -29,6 +29,7 @@ export default function PaymentPopup({
   const [pricePerKilo, setPricePerKilo] = useState('');
   const [selectedCreditIds, setSelectedCreditIds] = useState<number[]>([]);
   const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [shortfallAction, setShortfallAction] = useState<'carry_forward' | 'cash'>('carry_forward');
 
   useEffect(() => {
     fetchDetail();
@@ -47,6 +48,12 @@ export default function PaymentPopup({
         // If payment already exists, don't pre-select credits
         if (!d.existingPayment) {
           setSelectedCreditIds([]);
+        } else if (d.collections.every((c: any) => c.monthlyPaid)) {
+          setPaymentResult({
+            payment: d.existingPayment,
+            collections: d.collections,
+            settledCredits: d.pendingCredits, // these are actually settledCredits if isPending is false
+          });
         }
       }
     } catch (e) {
@@ -95,6 +102,11 @@ export default function PaymentPopup({
   const transportCostTotal = Math.round(lorryKilos * transportCostPerKilo * 100) / 100;
   const stampCostTotal = Math.round(totalKilos * stampCostPerKilo * 100) / 100;
   const otherDeductionAmt = Math.round(grossPayment * (otherDeductionPct / 100) * 100) / 100;
+  
+  const availableForDeduction = Math.max(0, grossPayment - transportCostTotal - stampCostTotal - otherDeductionAmt);
+  const totalCreditRequested = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction;
+  const shortfall = Math.max(0, totalCreditRequested - availableForDeduction);
+
   const netPayment = Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal - otherDeductionAmt);
 
   const handlePay = async () => {
@@ -113,6 +125,7 @@ export default function PaymentPopup({
           pricePerKilo: price,
           settledCreditIds: selectedCreditIds,
           settledCollectionIds: data?.collections?.map((c: any) => c.id) || [],
+          shortfallAction,
         }),
       });
       if (res.ok) {
@@ -129,6 +142,13 @@ export default function PaymentPopup({
   const handlePrint = () => {
     if (!paymentResult) return;
     const p = paymentResult.payment;
+    
+    // Deduce shortfall since it's not saved directly in the payment record
+    const availableForDed = p.grossPayment - p.transportCostTotal - p.stampCostTotal - p.otherDeductionAmt;
+    const requestedDed = p.groceryDeduction + p.fertiliserDeduction + p.cashAdvanceDeduction;
+    const computedShortfall = Math.max(0, requestedDed - availableForDed);
+    const actShortfallAction = p.cashReceived > 0 ? 'cash' : 'carry_forward';
+
     printReceipt({
       type: 'payment',
       receiptNo: `PAY-${p.id}`,
@@ -140,16 +160,18 @@ export default function PaymentPopup({
       groceryDeduction: p.groceryDeduction,
       fertiliserDeduction: p.fertiliserDeduction,
       cashAdvanceDeduction: p.cashAdvanceDeduction,
-      transportDeduction: transportCostTotal,
-      stampDeduction: stampCostTotal,
-      otherDeduction: otherDeductionAmt,
-      transportCostPerKilo: transportCostPerKilo,
-      stampCostPerKilo: stampCostPerKilo,
+      transportDeduction: p.transportCostTotal,
+      stampDeduction: p.stampCostTotal,
+      otherDeduction: p.otherDeductionAmt,
+      transportCostPerKilo: p.transportCostPerKilo,
+      stampCostPerKilo: p.stampCostPerKilo,
       netPayment: p.netPayment,
       month: monthNames[month - 1],
       year: year,
       collections: paymentResult.collections,
       settledCredits: paymentResult.settledCredits,
+      shortfallAmount: computedShortfall > 0 ? computedShortfall : undefined,
+      shortfallAction: computedShortfall > 0 ? actShortfallAction : undefined,
     });
   };
 
@@ -450,6 +472,46 @@ export default function PaymentPopup({
                   </div>
                 </div>
               </div>
+
+              {/* ========== SHORTFALL SECTION ========== */}
+              {shortfall > 0 && (
+                <div style={{
+                  background: '#fffbeb', borderRadius: '12px', padding: '16px',
+                  border: '1px solid #fcd34d', marginTop: '16px',
+                }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#b45309', marginBottom: '8px' }}>
+                    Credit Shortfall / ණය හිඟය: Rs. {shortfall.toLocaleString()}
+                  </h4>
+                  <p style={{ fontSize: '13px', color: '#92400e', marginBottom: '12px' }}>
+                    Earnings are not enough to cover all selected credits. How do you want to handle the remaining Rs. {shortfall.toLocaleString()}?
+                  </p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#92400e' }}>
+                      <input 
+                        type="radio" 
+                        name="shortfallAction" 
+                        value="carry_forward" 
+                        checked={shortfallAction === 'carry_forward'}
+                        onChange={() => setShortfallAction('carry_forward')}
+                        style={{ accentColor: '#b45309' }}
+                      />
+                      Carry forward to next month (Create new credit) / ඊළඟ මාසයට ගෙන යන්න
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#92400e' }}>
+                      <input 
+                        type="radio" 
+                        name="shortfallAction" 
+                        value="cash" 
+                        checked={shortfallAction === 'cash'}
+                        onChange={() => setShortfallAction('cash')}
+                        style={{ accentColor: '#b45309' }}
+                      />
+                      Customer pays by hand (Settle with cash) / අතින් ගෙවන්න
+                    </label>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

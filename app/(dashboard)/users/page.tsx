@@ -13,6 +13,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ username: '', password: '', name: '', role: 'staff' });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -25,6 +26,7 @@ export default function UsersPage() {
   };
 
   const handleAdd = async () => {
+    setSubmitting(true);
     try {
       const res = await fetch('/api/users', {
         method: 'POST',
@@ -41,6 +43,7 @@ export default function UsersPage() {
         showToast(data.error || t('common.error'), 'error');
       }
     } catch (e) { showToast(t('common.error'), 'error'); }
+    setSubmitting(false);
   };
 
   const handleDelete = async (id: number) => {
@@ -96,8 +99,8 @@ export default function UsersPage() {
       </div>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={t('users.addUser')}
-        footer={<><button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-          <button className="btn btn-primary" onClick={handleAdd}>{t('common.save')}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={submitting}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={handleAdd} disabled={submitting}>{submitting ? 'Saving...' : t('common.save')}</button></>}>
         <div className="form-group">
           <label className="form-label">{t('users.username')} *</label>
           <input className="form-input" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />

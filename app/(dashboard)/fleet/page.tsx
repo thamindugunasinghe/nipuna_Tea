@@ -19,6 +19,7 @@ export default function FleetPage() {
   const [editingDriverId, setEditingDriverId] = useState<number | null>(null);
   const [lorryForm, setLorryForm] = useState({ lorryNumber: '', capacity: '' });
   const [driverForm, setDriverForm] = useState({ name: '', phone: '', nic: '', lorryId: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -37,6 +38,7 @@ export default function FleetPage() {
   };
 
   const saveLorry = async () => {
+    setSubmitting(true);
     try {
       const url = editingLorryId ? `/api/fleet/lorries/${editingLorryId}` : '/api/fleet/lorries';
       const method = editingLorryId ? 'PUT' : 'POST';
@@ -54,9 +56,11 @@ export default function FleetPage() {
       }
       else showToast(t('common.error'), 'error');
     } catch (e) { showToast(t('common.error'), 'error'); }
+    setSubmitting(false);
   };
 
   const saveDriver = async () => {
+    setSubmitting(true);
     try {
       const url = editingDriverId ? `/api/fleet/drivers/${editingDriverId}` : '/api/fleet/drivers';
       const method = editingDriverId ? 'PUT' : 'POST';
@@ -74,6 +78,7 @@ export default function FleetPage() {
       }
       else showToast(t('common.error'), 'error');
     } catch (e) { showToast(t('common.error'), 'error'); }
+    setSubmitting(false);
   };
 
   const deleteLorry = async (id: number) => {
@@ -177,8 +182,8 @@ export default function FleetPage() {
 
       {/* Lorry Modal */}
       <Modal isOpen={showLorryModal} onClose={() => { setShowLorryModal(false); setEditingLorryId(null); }} title={editingLorryId ? 'Edit Lorry' : t('fleet.addLorry')}
-        footer={<><button className="btn btn-secondary" onClick={() => { setShowLorryModal(false); setEditingLorryId(null); }}>{t('common.cancel')}</button>
-          <button className="btn btn-primary" onClick={saveLorry}>{t('common.save')}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => { setShowLorryModal(false); setEditingLorryId(null); }} disabled={submitting}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={saveLorry} disabled={submitting}>{submitting ? 'Saving...' : t('common.save')}</button></>}>
         <div className="form-group">
           <label className="form-label">{t('fleet.lorryNumber')} *</label>
           <input className="form-input" value={lorryForm.lorryNumber} onChange={(e) => setLorryForm({ ...lorryForm, lorryNumber: e.target.value })} />
@@ -191,8 +196,8 @@ export default function FleetPage() {
 
       {/* Driver Modal */}
       <Modal isOpen={showDriverModal} onClose={() => { setShowDriverModal(false); setEditingDriverId(null); }} title={editingDriverId ? 'Edit Driver' : t('fleet.addDriver')}
-        footer={<><button className="btn btn-secondary" onClick={() => { setShowDriverModal(false); setEditingDriverId(null); }}>{t('common.cancel')}</button>
-          <button className="btn btn-primary" onClick={saveDriver}>{t('common.save')}</button></>}>
+        footer={<><button className="btn btn-secondary" onClick={() => { setShowDriverModal(false); setEditingDriverId(null); }} disabled={submitting}>{t('common.cancel')}</button>
+          <button className="btn btn-primary" onClick={saveDriver} disabled={submitting}>{submitting ? 'Saving...' : t('common.save')}</button></>}>
         <div className="form-group">
           <label className="form-label">{t('fleet.driverName')} *</label>
           <input className="form-input" value={driverForm.name} onChange={(e) => setDriverForm({ ...driverForm, name: e.target.value })} />
