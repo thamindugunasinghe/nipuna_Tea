@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendMonthlyPaymentSms } from '@/lib/sms';
+import { round2 } from '@/lib/billing';
 
 // Thrown inside the transaction when a collection/credit was paid by another request meanwhile
 class AlreadyPaidError extends Error {}
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     include: { driver: true },
     orderBy: { collectionDate: 'asc' },
   });
-  const totalKilos = collections.reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+  const totalKilos = round2(collections.reduce((sum, c) => sum + (c.kilosValidated as number), 0));
 
   if (totalKilos === 0) {
     return NextResponse.json(
@@ -62,9 +63,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Calculate transport cost: only for lorry collections (lorryId is not null)
-  const lorryKilos = collections
+  const lorryKilos = round2(collections
     .filter(c => c.lorryId !== null)
-    .reduce((sum, c) => sum + (c.kilosValidated as number), 0);
+    .reduce((sum, c) => sum + (c.kilosValidated as number), 0));
   const transportCostTotal = Math.round(lorryKilos * transportCostPerKilo * 100) / 100;
 
   // Stamp cost: applies to ALL collections
@@ -84,29 +85,30 @@ export async function POST(req: NextRequest) {
       orderBy: { purchaseDate: 'asc' },
     });
 
-    groceryDeduction = selectedCredits
+    groceryDeduction = round2(selectedCredits
       .filter(c => c.itemType === 'grocery')
-      .reduce((sum, c) => sum + c.totalCost, 0);
+      .reduce((sum, c) => sum + c.totalCost, 0));
 
-    fertiliserDeduction = selectedCredits
+    fertiliserDeduction = round2(selectedCredits
       .filter(c => c.itemType === 'fertiliser')
-      .reduce((sum, c) => sum + c.totalCost, 0);
+      .reduce((sum, c) => sum + c.totalCost, 0));
 
-    cashAdvanceDeduction = selectedCredits
+    cashAdvanceDeduction = round2(selectedCredits
       .filter(c => c.itemType === 'cash_advance')
-      .reduce((sum, c) => sum + c.totalCost, 0);
+      .reduce((sum, c) => sum + c.totalCost, 0));
   }
 
   // Calculate payment
-  const grossPayment = totalKilos * pricePerKilo;
+  // All money rounded to 2 decimals (same maths as the popup preview)
+  const grossPayment = round2(totalKilos * pricePerKilo);
   const otherDeductionAmt = Math.round(grossPayment * (otherDeductionPct / 100) * 100) / 100;
   
   const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction + transportCostTotal + stampCostTotal + otherDeductionAmt;
-  const netPayment = Math.max(0, grossPayment - totalDeductions);
+  const netPayment = round2(Math.max(0, grossPayment - totalDeductions));
 
-  const availableForDeduction = Math.max(0, grossPayment - transportCostTotal - stampCostTotal - otherDeductionAmt);
+  const availableForDeduction = round2(Math.max(0, grossPayment - transportCostTotal - stampCostTotal - otherDeductionAmt));
   const creditDeductionRequested = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction;
-  const shortfall = Math.max(0, creditDeductionRequested - availableForDeduction);
+  const shortfall = round2(Math.max(0, creditDeductionRequested - availableForDeduction));
   
   let cashReceived = 0;
   if (shortfall > 0 && shortfallAction === 'cash') {

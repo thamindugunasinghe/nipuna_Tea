@@ -52,7 +52,16 @@ export default function CommissionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ month, year, pricePerKilo: parseFloat(pricePerKilo) }),
       });
-      if (res.ok) { showToast(t('commissions.calculateSuccess'), 'success'); fetchCommissions(); }
+      if (res.ok) {
+        const skipped = parseInt(res.headers.get('X-Skipped-Paid') || '0');
+        showToast(
+          skipped > 0
+            ? `${t('commissions.calculateSuccess')} (${skipped} already-paid commission(s) not changed)`
+            : t('commissions.calculateSuccess'),
+          'success'
+        );
+        fetchCommissions();
+      }
       else showToast(t('common.error'), 'error');
     } catch (e) { showToast(t('common.error'), 'error'); }
     setCalculating(false);

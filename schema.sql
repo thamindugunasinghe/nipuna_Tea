@@ -269,3 +269,12 @@ CREATE INDEX IF NOT EXISTS "tea_collections_collection_date_idx" ON "tea_collect
 CREATE INDEX IF NOT EXISTS "tea_collections_lorry_id_collection_date_idx" ON "tea_collections"("lorry_id", "collection_date");
 CREATE INDEX IF NOT EXISTS "tea_collections_driver_id_collection_date_idx" ON "tea_collections"("driver_id", "collection_date");
 CREATE INDEX IF NOT EXISTS "tea_collections_year_month_idx" ON "tea_collections"("year", "month");
+
+-- Amounts actually paid for instant cash collections
+ALTER TABLE "tea_collections"
+  ADD COLUMN IF NOT EXISTS "instant_price_per_kilo" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "instant_gross_pay" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "instant_transport" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "instant_stamp" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "instant_other" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "instant_net_pay" DOUBLE PRECISION;

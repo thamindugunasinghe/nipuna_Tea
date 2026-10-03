@@ -123,6 +123,13 @@ model TeaCollection {
   kilosValidated     Float?   @map("kilos_validated")
   instantPaid    Boolean  @default(false) @map("instant_paid")
   instantPaidAt  DateTime? @map("instant_paid_at")
+  // What was actually paid for an instant cash collection (null for payments made before these were saved)
+  instantPricePerKilo Float? @map("instant_price_per_kilo")
+  instantGrossPay     Float? @map("instant_gross_pay")
+  instantTransport    Float? @map("instant_transport")
+  instantStamp        Float? @map("instant_stamp")
+  instantOther        Float? @map("instant_other")
+  instantNetPay       Float? @map("instant_net_pay")
   monthlyPaid    Boolean  @default(false) @map("monthly_paid")
   monthlyPaymentId Int?   @map("monthly_payment_id")
   waterScore     Int      @default(0) @map("water_score") // DEPRECATED - kept for old data

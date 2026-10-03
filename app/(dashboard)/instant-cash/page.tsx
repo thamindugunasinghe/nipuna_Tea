@@ -5,6 +5,7 @@ import { Banknote, CheckCircle, Search, History, Printer, Loader2 } from 'lucide
 import Toast, { useToast } from '@/components/Toast';
 import Modal from '@/components/Modal';
 import { printReceipt } from '@/lib/printReceipt';
+import { instantBreakdown, numSetting } from '@/lib/billing';
 
 export default function InstantCashPage() {
   const { toast, showToast, hideToast } = useToast();
@@ -41,9 +42,9 @@ export default function InstantCashPage() {
       if (res.ok) {
         const settings = await res.json();
         setPricePerKilo(settings.tea_price_per_kilo || '');
-        setTransportCostPerKilo(parseFloat(settings.transport_cost_per_kilo) || 6);
-        setStampCostPerKilo(parseFloat(settings.stamp_cost_per_kilo) || 0);
-        setOtherDeductionPct(parseFloat(settings.other_deduction_pct) || 5);
+        setTransportCostPerKilo(numSetting(settings.transport_cost_per_kilo, 6));
+        setStampCostPerKilo(numSetting(settings.stamp_cost_per_kilo, 0));
+        setOtherDeductionPct(numSetting(settings.other_deduction_pct, 5));
       }
     } catch (e) {
       console.error(e);
@@ -96,13 +97,10 @@ export default function InstantCashPage() {
   const getPaymentBreakdown = (collection: any) => {
     if (!collection) return { grossPay: 0, transportTotal: 0, stampTotal: 0, otherTotal: 0, finalPayment: 0 };
     const price = parseFloat(pricePerKilo) || 0;
-    const grossPay = collection.netKilos * price;
-    const isLorry = collection.lorryId !== null;
-    const transportTotal = isLorry ? Math.round(collection.netKilos * transportCostPerKilo * 100) / 100 : 0;
-    const stampTotal = Math.round(collection.netKilos * stampCostPerKilo * 100) / 100;
-    const otherTotal = Math.round(grossPay * (otherDeductionPct / 100) * 100) / 100;
-    const finalPayment = Math.max(0, grossPay - transportTotal - stampTotal - otherTotal);
-    return { grossPay, transportTotal, stampTotal, otherTotal, finalPayment };
+    // Same maths as the server (lib/billing.ts)
+    return instantBreakdown(collection.netKilos, collection.lorryId !== null, price, {
+      transportCostPerKilo, stampCostPerKilo, otherDeductionPct,
+    });
   };
 
   const handleProcessPayment = async () => {
@@ -116,14 +114,15 @@ export default function InstantCashPage() {
       const res = await fetch('/api/instant-cash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedCollection.id }),
+        body: JSON.stringify({ id: selectedCollection.id, pricePerKilo: parseFloat(pricePerKilo) }),
       });
 
       if (res.ok) {
+        const saved = await res.json();
         showToast('Payment processed successfully!', 'success');
         setShowModal(false);
-        const breakdown = getPaymentBreakdown(selectedCollection);
-        handlePrint(selectedCollection, pricePerKilo, breakdown);
+        // Print exactly what the server calculated and saved
+        handlePrint(selectedCollection, String(saved.pricePerKilo), saved);
         fetchCollections();
       } else {
         const err = await res.json();
@@ -244,8 +243,19 @@ export default function InstantCashPage() {
                         Completed
                       </span>
                       <button className="btn btn-secondary btn-sm" onClick={() => {
-                        const b = getPaymentBreakdown(c);
-                        handlePrint(c, pricePerKilo || '0', b);
+                        if (c.instantNetPay != null) {
+                          // Reprint exactly what was paid
+                          handlePrint(c, String(c.instantPricePerKilo), {
+                            transportTotal: c.instantTransport,
+                            stampTotal: c.instantStamp,
+                            otherTotal: c.instantOther,
+                            finalPayment: c.instantNetPay,
+                          });
+                        } else {
+                          // Paid before amounts were saved: best estimate with today's price/settings
+                          const b = getPaymentBreakdown(c);
+                          handlePrint(c, pricePerKilo || '0', b);
+                        }
                       }}>
                         <Printer size={14} />
                       </button>

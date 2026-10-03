@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Leaf, ShoppingCart, CheckSquare, Square, CheckCircle, Printer, Loader2 } from 'lucide-react';
 import { printReceipt } from '@/lib/printReceipt';
+import { round2 } from '@/lib/billing';
 
 interface PaymentPopupProps {
   customerId: number;
@@ -81,34 +82,35 @@ export default function PaymentPopup({
 
   // Calculations
   const price = parseFloat(pricePerKilo || '0');
-  const totalKilos = data?.totalValidatedKilos || 0;
-  const grossPayment = totalKilos * price;
+  // All money rounded to 2 decimals (same maths as the server)
+  const totalKilos = round2(data?.totalValidatedKilos || 0);
+  const grossPayment = round2(totalKilos * price);
 
   const selectedCredits = data?.pendingCredits?.filter((c: any) => selectedCreditIds.includes(c.id)) || [];
-  const groceryDeduction = selectedCredits
+  const groceryDeduction = round2(selectedCredits
     .filter((c: any) => c.itemType === 'grocery')
-    .reduce((sum: number, c: any) => sum + c.totalCost, 0);
-  const fertiliserDeduction = selectedCredits
+    .reduce((sum: number, c: any) => sum + c.totalCost, 0));
+  const fertiliserDeduction = round2(selectedCredits
     .filter((c: any) => c.itemType === 'fertiliser')
-    .reduce((sum: number, c: any) => sum + c.totalCost, 0);
-  const cashAdvanceDeduction = selectedCredits
+    .reduce((sum: number, c: any) => sum + c.totalCost, 0));
+  const cashAdvanceDeduction = round2(selectedCredits
     .filter((c: any) => c.itemType === 'cash_advance')
-    .reduce((sum: number, c: any) => sum + c.totalCost, 0);
+    .reduce((sum: number, c: any) => sum + c.totalCost, 0));
   const totalDeductions = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction;
 
   const transportCostPerKilo = data?.transportCostPerKilo || 0;
   const stampCostPerKilo = data?.stampCostPerKilo || 0;
   const otherDeductionPct = data?.otherDeductionPct || 5;
-  const lorryKilos = data?.lorryKilos || 0;
+  const lorryKilos = round2(data?.lorryKilos || 0);
   const transportCostTotal = Math.round(lorryKilos * transportCostPerKilo * 100) / 100;
   const stampCostTotal = Math.round(totalKilos * stampCostPerKilo * 100) / 100;
   const otherDeductionAmt = Math.round(grossPayment * (otherDeductionPct / 100) * 100) / 100;
   
-  const availableForDeduction = Math.max(0, grossPayment - transportCostTotal - stampCostTotal - otherDeductionAmt);
+  const availableForDeduction = round2(Math.max(0, grossPayment - transportCostTotal - stampCostTotal - otherDeductionAmt));
   const totalCreditRequested = groceryDeduction + fertiliserDeduction + cashAdvanceDeduction;
-  const shortfall = Math.max(0, totalCreditRequested - availableForDeduction);
+  const shortfall = round2(Math.max(0, totalCreditRequested - availableForDeduction));
 
-  const netPayment = Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal - otherDeductionAmt);
+  const netPayment = round2(Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal - otherDeductionAmt));
 
   const handlePay = async () => {
     if (!price || price <= 0 || payingRef.current) return;
