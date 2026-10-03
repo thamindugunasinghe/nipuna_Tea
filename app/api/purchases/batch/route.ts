@@ -9,6 +9,13 @@ export async function POST(req: NextRequest) {
   if (!customerId || !itemType || !items || !Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
   }
+  const badItem = items.some((item: any) => {
+    const price = parseFloat(item?.unitPrice);
+    return !Number.isFinite(price) || price <= 0 || (item.quantity != null && !(Number(item.quantity) > 0));
+  });
+  if (badItem) {
+    return NextResponse.json({ error: 'Price and quantity must be greater than 0' }, { status: 400 });
+  }
 
   // Only regular customers can make credit purchases
   const customer = await prisma.customer.findUnique({ where: { id: customerId } });

@@ -30,6 +30,10 @@ export async function GET(req: NextRequest) {
   const paymentMonth = startDate.getMonth() + 1;
   const paymentYear = startDate.getFullYear();
 
+  // Months (year/month) that overlap the selected date range
+  const startY = startDate.getFullYear(), startM = startDate.getMonth() + 1;
+  const endY = endDate.getFullYear(), endM = endDate.getMonth() + 1;
+
   // Get all active regular customers with their filtered data in ONE query
   const customers = await prisma.customer.findMany({
     where: { active: true, type: 'regular' },
@@ -40,6 +44,9 @@ export async function GET(req: NextRequest) {
           collectionDate: { lte: endDate },
           kilosValidated: { not: null },
           instantPaid: false,
+          // Only rows that can count below: unpaid ones, or ones inside the range.
+          // (Already-paid rows before the range were loaded and ignored before.)
+          OR: [{ monthlyPaid: false }, { collectionDate: { gte: startDate } }],
         },
         select: { kilosValidated: true, monthlyPaid: true, collectionDate: true },
       },
@@ -50,7 +57,15 @@ export async function GET(req: NextRequest) {
         },
         select: { totalCost: true },
       },
-      monthlyPayments: true,
+      // Only payments whose month overlaps the range (same rule as the filter below)
+      monthlyPayments: {
+        where: {
+          AND: [
+            { OR: [{ year: { gt: startY } }, { year: startY, month: { gte: startM } }] },
+            { OR: [{ year: { lt: endY } }, { year: endY, month: { lte: endM } }] },
+          ],
+        },
+      },
     },
   });
 
@@ -99,6 +114,9 @@ export async function GET(req: NextRequest) {
         customerPhone: customer.phone,
         customerId_display: customer.customerId,
         totalKilos,
+        // Unpaid kilos up to the end date — what the Pay popup will bill
+        // (includes late entries from before the start date)
+        unpaidKilos,
         totalPendingCredit,
         pendingCreditCount: customer.creditPurchases.length,
         payment: isPending ? null : existingPayment,

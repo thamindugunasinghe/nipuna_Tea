@@ -73,31 +73,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Please start your operation first / කරුණාකර පළමුව මෙහෙයුම ආරම්භ කරන්න' }, { status: 400 });
   }
 
-  // Create tea collection with kilosValidated calculated immediately
-  const collection = await prisma.teaCollection.create({
-    data: {
-      customerId,
-      driverId,
-      lorryId: lorryId || null,
-      kilosByDriver: kilos,
-      waterDeduction: waterDed,
-      packagingDeduction: packDed,
-      kilosValidated: netKilos,
-      collectionDate: today,
-      month: today.getMonth() + 1,
-      year: today.getFullYear(),
-    },
-    include: { customer: true },
-  });
-
-  // Update session counters (use net kilos after deduction)
-  await prisma.driverSession.update({
-    where: { id: session.id },
-    data: {
-      collectionsCount: { increment: 1 },
-      totalKilos: { increment: netKilos },
-    },
-  });
+  // Create tea collection (kilosValidated calculated immediately) and update the
+  // session counters together, so the session totals never drift from the records
+  const [collection] = await prisma.$transaction([
+    prisma.teaCollection.create({
+      data: {
+        customerId,
+        driverId,
+        lorryId: lorryId || null,
+        kilosByDriver: kilos,
+        waterDeduction: waterDed,
+        packagingDeduction: packDed,
+        kilosValidated: netKilos,
+        collectionDate: today,
+        month: today.getMonth() + 1,
+        year: today.getFullYear(),
+      },
+      include: { customer: true },
+    }),
+    // Update session counters (use net kilos after deduction)
+    prisma.driverSession.update({
+      where: { id: session.id },
+      data: {
+        collectionsCount: { increment: 1 },
+        totalKilos: { increment: netKilos },
+      },
+    }),
+  ]);
 
   console.log(`[COLLECT] Driver ${driverId} collected ${kilos}kg (deduction: ${totalDeduction}kg, net: ${netKilos}kg) from customer ${customerId}`);
 

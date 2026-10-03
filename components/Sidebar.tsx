@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTranslation } from '@/lib/i18n';
@@ -33,12 +33,14 @@ const navItems = [
   { href: '/payments', icon: DollarSign, labelKey: 'nav.payments' },
   { href: '/commissions', icon: Award, labelKey: 'nav.commissions' },
   { href: '/settings', icon: Settings, labelKey: 'nav.settings' },
-  { href: '/users', icon: UserCog, labelKey: 'nav.users' },
+  { href: '/users', icon: UserCog, labelKey: 'nav.users', adminOnly: true },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === 'admin';
 
   return (
     <>
@@ -59,7 +61,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item) => {
+          {navItems.filter((item) => !item.adminOnly || isAdmin).map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
             const Icon = item.icon;
             return (

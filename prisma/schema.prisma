@@ -106,6 +106,9 @@ model CreditPurchase {
   fertiliser     Fertiliser?     @relation(fields: [fertiliserId], references: [id])
   monthlyPayment MonthlyPayment? @relation(fields: [monthlyPaymentId], references: [id])
 
+  @@index([customerId, settled])
+  @@index([year, month])
+  @@index([purchaseDate])
   @@map("credit_purchases")
 }
 
@@ -133,6 +136,11 @@ model TeaCollection {
   lorry    Lorry?   @relation(fields: [lorryId], references: [id])
   monthlyPayment MonthlyPayment? @relation(fields: [monthlyPaymentId], references: [id])
 
+  @@index([customerId, collectionDate])
+  @@index([collectionDate])
+  @@index([lorryId, collectionDate])
+  @@index([driverId, collectionDate])
+  @@index([year, month])
   @@map("tea_collections")
 }
 
@@ -183,6 +191,7 @@ model MonthlyPayment {
   settledCredits  CreditPurchase[]
   settledCollections TeaCollection[]
 
+  @@index([year, month])
   @@unique([customerId, month, year])
   @@map("monthly_payments")
 }
@@ -202,6 +211,7 @@ model DriverCommission {
 
   driver Driver @relation(fields: [driverId], references: [id])
 
+  @@index([year, month])
   @@unique([driverId, month, year])
   @@map("driver_commissions")
 }
@@ -241,6 +251,7 @@ model DriverSession {
   driver Driver @relation(fields: [driverId], references: [id])
   lorry  Lorry? @relation(fields: [lorryId], references: [id])
 
+  @@index([sessionDate])
   @@unique([driverId, sessionDate])
   @@map("driver_sessions")
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Leaf, ShoppingCart, CheckSquare, Square, CheckCircle, Printer, Loader2 } from 'lucide-react';
 import { printReceipt } from '@/lib/printReceipt';
 
@@ -25,6 +25,7 @@ export default function PaymentPopup({
 }: PaymentPopupProps) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const payingRef = useRef(false); // blocks a second click before the button re-renders as disabled
   const [data, setData] = useState<any>(null);
   const [pricePerKilo, setPricePerKilo] = useState('');
   const [selectedCreditIds, setSelectedCreditIds] = useState<number[]>([]);
@@ -110,7 +111,8 @@ export default function PaymentPopup({
   const netPayment = Math.max(0, grossPayment - totalDeductions - transportCostTotal - stampCostTotal - otherDeductionAmt);
 
   const handlePay = async () => {
-    if (!price || price <= 0) return;
+    if (!price || price <= 0 || payingRef.current) return;
+    payingRef.current = true;
     setSubmitting(true);
     try {
       const res = await fetch('/api/payments/calculate', {
@@ -128,20 +130,28 @@ export default function PaymentPopup({
           shortfallAction,
         }),
       });
+      const result = await res.json().catch(() => ({}));
       if (res.ok) {
-        const result = await res.json();
         setPaymentResult(result);
         onPaymentComplete();
+      } else {
+        alert(result.error || 'Payment failed. Please try again.');
       }
     } catch (e) {
       console.error(e);
+      alert('Payment failed. Please check your connection and try again.');
     }
+    payingRef.current = false;
     setSubmitting(false);
   };
 
   const handlePrint = () => {
     if (!paymentResult) return;
-    const p = paymentResult.payment;
+    // Right after paying: print this payment's own figures (thisPayment).
+    // Viewing an older payment: only the month record exists, so print that.
+    const p = paymentResult.thisPayment
+      ? { ...paymentResult.payment, ...paymentResult.thisPayment }
+      : paymentResult.payment;
     
     // Deduce shortfall since it's not saved directly in the payment record
     const availableForDed = p.grossPayment - p.transportCostTotal - p.stampCostTotal - p.otherDeductionAmt;
@@ -224,7 +234,7 @@ export default function PaymentPopup({
                 fontSize: '32px', fontWeight: 800, color: 'var(--primary-700)',
                 margin: '16px 0',
               }}>
-                Rs. {paymentResult.payment.netPayment.toLocaleString()}
+                Rs. {(paymentResult.thisPayment ?? paymentResult.payment).netPayment.toLocaleString()}
               </div>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
                 <button className="btn btn-primary" onClick={handlePrint}>

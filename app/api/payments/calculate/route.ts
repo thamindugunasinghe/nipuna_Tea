@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendMonthlyPaymentSms } from '@/lib/sms';
 
+// Thrown inside the transaction when a collection/credit was paid by another request meanwhile
+class AlreadyPaidError extends Error {}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { customerId, month, year, startDate, endDate, pricePerKilo, settledCreditIds, settledCollectionIds, shortfallAction } = body;
@@ -11,6 +14,15 @@ export async function POST(req: NextRequest) {
       { error: 'customerId, month, year, and pricePerKilo are required' },
       { status: 400 }
     );
+  }
+  if (!Number.isFinite(Number(pricePerKilo)) || Number(pricePerKilo) <= 0) {
+    return NextResponse.json({ error: 'pricePerKilo must be a number greater than 0' }, { status: 400 });
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year)) {
+    return NextResponse.json({ error: 'Invalid month or year' }, { status: 400 });
+  }
+  if (shortfallAction != null && shortfallAction !== 'cash' && shortfallAction !== 'carry_forward') {
+    return NextResponse.json({ error: 'Invalid shortfallAction' }, { status: 400 });
   }
 
   // Get cost settings (Batched query)
@@ -32,7 +44,10 @@ export async function POST(req: NextRequest) {
     where: { 
       id: { in: collectionIds },
       customerId, 
-      kilosValidated: { not: null } 
+      kilosValidated: { not: null },
+      // Only unpaid collections: a double click / retry can't bill the same tea twice
+      monthlyPaid: false,
+      instantPaid: false,
     },
     include: { driver: true },
     orderBy: { collectionDate: 'asc' },
@@ -98,97 +113,115 @@ export async function POST(req: NextRequest) {
     cashReceived = shortfall;
   }
 
-  // Accumulate with existing payment if it exists
-  const existingPayment = await prisma.monthlyPayment.findUnique({
-    where: { customerId_month_year: { customerId, month, year } }
-  });
-
-  let mergedCreditIds = creditIds;
-  if (existingPayment?.settledCreditIds) {
-    const oldIds = existingPayment.settledCreditIds as number[];
-    mergedCreditIds = Array.from(new Set([...oldIds, ...creditIds]));
-  }
-
-  const payment = await prisma.monthlyPayment.upsert({
-    where: { customerId_month_year: { customerId, month, year } },
-    update: {
-      totalKilos: { increment: totalKilos },
-      grossPayment: { increment: grossPayment },
-      groceryDeduction: { increment: groceryDeduction },
-      fertiliserDeduction: { increment: fertiliserDeduction },
-      cashAdvanceDeduction: { increment: cashAdvanceDeduction },
-      transportCostTotal: { increment: transportCostTotal },
-      stampCostTotal: { increment: stampCostTotal },
-      otherDeductionAmt: { increment: otherDeductionAmt },
-      netPayment: { increment: netPayment },
-      cashReceived: { increment: cashReceived },
-      settledCreditIds: mergedCreditIds,
-      paid: true,
-      paidAt: new Date(),
-    },
-    create: {
-      customerId,
-      month,
-      year,
-      totalKilos,
-      pricePerKilo,
-      grossPayment,
-      groceryDeduction,
-      fertiliserDeduction,
-      cashAdvanceDeduction,
-      transportCostPerKilo,
-      transportCostTotal,
-      stampCostPerKilo,
-      stampCostTotal,
-      otherDeductionPct,
-      otherDeductionAmt,
-      netPayment,
-      cashReceived,
-      settledCreditIds: mergedCreditIds,
-      paid: true,
-      paidAt: new Date(),
-    },
-    include: { customer: true },
-  });
-
-  // Mark only the selected credits as settled and link to payment
-  if (creditIds.length > 0) {
-    await prisma.creditPurchase.updateMany({
-      where: { id: { in: creditIds }, customerId },
-      data: { settled: true, monthlyPaymentId: payment.id },
+  // All writes in one transaction: payment, settled credits, carry-forward and paid collections
+  // either all save or none do.
+  const payment = await prisma.$transaction(async (tx) => {
+    // Accumulate with existing payment if it exists
+    const existingPayment = await tx.monthlyPayment.findUnique({
+      where: { customerId_month_year: { customerId, month, year } }
     });
-  }
 
-  // If carry forward, create a new credit purchase for the shortfall
-  if (shortfall > 0 && shortfallAction === 'carry_forward') {
-    // Next month calculation
-    let nextMonth = month + 1;
-    let nextYear = year;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextYear += 1;
+    let mergedCreditIds = creditIds;
+    if (existingPayment?.settledCreditIds) {
+      const oldIds = existingPayment.settledCreditIds as number[];
+      mergedCreditIds = Array.from(new Set([...oldIds, ...creditIds]));
     }
-    await prisma.creditPurchase.create({
-      data: {
-        customerId,
-        itemType: 'cash_advance',
-        description: 'Brought forward from previous month',
-        quantity: 1,
-        unitPrice: shortfall,
-        totalCost: shortfall,
-        month: nextMonth,
-        year: nextYear,
-        settled: false,
-      }
-    });
-  }
 
-  // Mark collections as paid and link to payment
-  if (collections.length > 0) {
-    await prisma.teaCollection.updateMany({
-      where: { id: { in: collections.map(c => c.id) }, customerId },
-      data: { monthlyPaid: true, monthlyPaymentId: payment.id },
+    const payment = await tx.monthlyPayment.upsert({
+      where: { customerId_month_year: { customerId, month, year } },
+      update: {
+        totalKilos: { increment: totalKilos },
+        grossPayment: { increment: grossPayment },
+        groceryDeduction: { increment: groceryDeduction },
+        fertiliserDeduction: { increment: fertiliserDeduction },
+        cashAdvanceDeduction: { increment: cashAdvanceDeduction },
+        transportCostTotal: { increment: transportCostTotal },
+        stampCostTotal: { increment: stampCostTotal },
+        otherDeductionAmt: { increment: otherDeductionAmt },
+        netPayment: { increment: netPayment },
+        cashReceived: { increment: cashReceived },
+        settledCreditIds: mergedCreditIds,
+        paid: true,
+        paidAt: new Date(),
+      },
+      create: {
+        customerId,
+        month,
+        year,
+        totalKilos,
+        pricePerKilo,
+        grossPayment,
+        groceryDeduction,
+        fertiliserDeduction,
+        cashAdvanceDeduction,
+        transportCostPerKilo,
+        transportCostTotal,
+        stampCostPerKilo,
+        stampCostTotal,
+        otherDeductionPct,
+        otherDeductionAmt,
+        netPayment,
+        cashReceived,
+        settledCreditIds: mergedCreditIds,
+        paid: true,
+        paidAt: new Date(),
+      },
+      include: { customer: true },
     });
+
+    // Mark only the selected credits as settled and link to payment
+    if (selectedCredits.length > 0) {
+      const settledNow = await tx.creditPurchase.updateMany({
+        where: { id: { in: selectedCredits.map(c => c.id) }, customerId, settled: false },
+        data: { settled: true, monthlyPaymentId: payment.id },
+      });
+      if (settledNow.count !== selectedCredits.length) throw new AlreadyPaidError();
+    }
+
+    // If carry forward, create a new credit purchase for the shortfall
+    if (shortfall > 0 && shortfallAction === 'carry_forward') {
+      // Next month calculation
+      let nextMonth = month + 1;
+      let nextYear = year;
+      if (nextMonth > 12) {
+        nextMonth = 1;
+        nextYear += 1;
+      }
+      await tx.creditPurchase.create({
+        data: {
+          customerId,
+          itemType: 'cash_advance',
+          description: 'Brought forward from previous month',
+          quantity: 1,
+          unitPrice: shortfall,
+          totalCost: shortfall,
+          month: nextMonth,
+          year: nextYear,
+          settled: false,
+        }
+      });
+    }
+
+    // Mark collections as paid and link to payment
+    if (collections.length > 0) {
+      const paidNow = await tx.teaCollection.updateMany({
+        where: { id: { in: collections.map(c => c.id) }, customerId, monthlyPaid: false },
+        data: { monthlyPaid: true, monthlyPaymentId: payment.id },
+      });
+      if (paidNow.count !== collections.length) throw new AlreadyPaidError();
+    }
+
+    return payment;
+  }, { timeout: 20000 }).catch((err) => {
+    if (err instanceof AlreadyPaidError) return null;
+    throw err;
+  });
+
+  if (!payment) {
+    return NextResponse.json(
+      { error: 'This payment was already processed. Please refresh. / මෙම ගෙවීම දැනටමත් සිදු කර ඇත.' },
+      { status: 409 }
+    );
   }
 
   // Send SMS notification to customer (async, non-blocking)
@@ -216,7 +249,25 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    payment,
+    payment, // month record (running total for the month)
+    // This payment only — what the receipt should show (same numbers as the SMS)
+    thisPayment: {
+      totalKilos,
+      pricePerKilo,
+      grossPayment,
+      groceryDeduction,
+      fertiliserDeduction,
+      cashAdvanceDeduction,
+      transportCostPerKilo,
+      transportCostTotal,
+      stampCostPerKilo,
+      stampCostTotal,
+      otherDeductionAmt,
+      netPayment,
+      cashReceived,
+      shortfall,
+      shortfallAction: shortfall > 0 ? shortfallAction : null,
+    },
     collections,
     settledCredits: selectedCredits,
   });

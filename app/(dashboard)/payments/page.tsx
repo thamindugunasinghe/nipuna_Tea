@@ -12,6 +12,7 @@ interface CustomerSummary {
   customerPhone: string | null;
   customerId_display: string;
   totalKilos: number;
+  unpaidKilos: number; // unpaid up to end date = what Pay will bill (incl. late entries before start date)
   totalPendingCredit: number;
   pendingCreditCount: number;
   payment: any;
@@ -190,6 +191,11 @@ export default function PaymentsPage() {
                   <td>
                     <span style={{ fontWeight: 600 }}>{c.totalKilos.toLocaleString()}</span>{' '}
                     <span style={{ color: 'var(--gray-400)', fontSize: '12px' }}>kg</span>
+                    {c.unpaidKilos > 0 && Math.abs(c.unpaidKilos - c.totalKilos) > 0.001 && (
+                      <div style={{ color: '#92400e', fontSize: '12px', fontWeight: 600 }}>
+                        {(Math.round(c.unpaidKilos * 100) / 100).toLocaleString()} kg to bill
+                      </div>
+                    )}
                   </td>
                   <td className="amount-negative">
                     Rs. {c.totalPendingCredit.toLocaleString()}
@@ -202,10 +208,10 @@ export default function PaymentsPage() {
                     )}
                   </td>
                   <td>
-                    <span className={`badge ${c.payment?.paid ? 'badge-green' : (c.totalKilos === 0 ? 'badge-gray' : 'badge-amber')}`}>
+                    <span className={`badge ${c.payment?.paid ? 'badge-green' : (c.totalKilos === 0 && !c.unpaidKilos ? 'badge-gray' : 'badge-amber')}`}>
                       {c.payment?.paid ? (
                         <><CheckCircle size={12} style={{ marginRight: 4 }} /> Paid</>
-                      ) : c.totalKilos === 0 ? (
+                      ) : c.totalKilos === 0 && !c.unpaidKilos ? (
                         <>No Tea</>
                       ) : (
                         <><Clock size={12} style={{ marginRight: 4 }} /> Pending</>
@@ -225,7 +231,7 @@ export default function PaymentsPage() {
                     <button
                       className="btn btn-sm btn-primary"
                       onClick={(e) => { e.stopPropagation(); setSelectedCustomer(c); }}
-                      disabled={!c.payment?.paid && c.totalKilos === 0}
+                      disabled={!c.payment?.paid && c.totalKilos === 0 && !c.unpaidKilos}
                     >
                       <DollarSign size={14} />
                       {c.payment?.paid ? 'View' : 'Pay'}

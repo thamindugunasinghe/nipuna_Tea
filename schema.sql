@@ -256,3 +256,16 @@ CREATE TABLE IF NOT EXISTS "otp_codes" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "otp_codes_pkey" PRIMARY KEY ("key")
 );
+
+-- Indexes for common filters (customer, date, month/year)
+CREATE INDEX IF NOT EXISTS "credit_purchases_customer_id_settled_idx" ON "credit_purchases"("customer_id", "settled");
+CREATE INDEX IF NOT EXISTS "credit_purchases_year_month_idx" ON "credit_purchases"("year", "month");
+CREATE INDEX IF NOT EXISTS "credit_purchases_purchase_date_idx" ON "credit_purchases"("purchase_date");
+CREATE INDEX IF NOT EXISTS "driver_commissions_year_month_idx" ON "driver_commissions"("year", "month");
+CREATE INDEX IF NOT EXISTS "driver_sessions_session_date_idx" ON "driver_sessions"("session_date");
+CREATE INDEX IF NOT EXISTS "monthly_payments_year_month_idx" ON "monthly_payments"("year", "month");
+CREATE INDEX IF NOT EXISTS "tea_collections_customer_id_collection_date_idx" ON "tea_collections"("customer_id", "collection_date");
+CREATE INDEX IF NOT EXISTS "tea_collections_collection_date_idx" ON "tea_collections"("collection_date");
+CREATE INDEX IF NOT EXISTS "tea_collections_lorry_id_collection_date_idx" ON "tea_collections"("lorry_id", "collection_date");
+CREATE INDEX IF NOT EXISTS "tea_collections_driver_id_collection_date_idx" ON "tea_collections"("driver_id", "collection_date");
+CREATE INDEX IF NOT EXISTS "tea_collections_year_month_idx" ON "tea_collections"("year", "month");

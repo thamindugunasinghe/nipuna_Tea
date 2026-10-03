@@ -22,6 +22,16 @@ export async function POST(req: NextRequest) {
   const kilos = parseFloat(kilosByDriver);
   const waterDed = parseFloat(waterDeduction) || 0;
   const packDed = parseFloat(packagingDeduction) || 0;
+  if (!Number.isFinite(kilos) || kilos <= 0) {
+    return NextResponse.json({ error: 'Invalid kilos value' }, { status: 400 });
+  }
+  if (waterDed < 0 || packDed < 0 || waterDed + packDed >= kilos) {
+    return NextResponse.json({ error: 'Deductions must be >= 0 and less than kilos / අඩු කිරීම් 0 ට වැඩි සහ කිලෝ වලට වඩා අඩු විය යුතුය' }, { status: 400 });
+  }
+  if (isNaN(new Date(collectionDate).getTime())) {
+    return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+  }
+
   const netKilos = Math.round((kilos - waterDed - packDed) * 100) / 100;
 
   const date = new Date(collectionDate);

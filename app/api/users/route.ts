@@ -17,6 +17,12 @@ export async function POST(req: NextRequest) {
   if (!username || !password || !name) {
     return NextResponse.json({ error: 'Username, password, and name are required' }, { status: 400 });
   }
+  if (String(password).length < 6) {
+    return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+  }
+  if (role && role !== 'admin' && role !== 'staff') {
+    return NextResponse.json({ error: 'Role must be admin or staff' }, { status: 400 });
+  }
 
   const passwordHash = await bcrypt.hash(password, 10);
 

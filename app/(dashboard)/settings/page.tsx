@@ -42,12 +42,17 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setSubmitting(true);
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       });
-      showToast(t('settings.saveSuccess'), 'success');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || t('common.error'), 'error');
+      } else {
+        showToast(t('settings.saveSuccess'), 'success');
+      }
     } catch (e) { showToast(t('common.error'), 'error'); }
     setSubmitting(false);
   };

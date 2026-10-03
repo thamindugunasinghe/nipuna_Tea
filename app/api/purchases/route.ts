@@ -18,6 +18,10 @@ export async function POST(req: NextRequest) {
   if (!customerId || !itemType || !unitPrice) {
     return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
   }
+  const price = parseFloat(unitPrice);
+  if (!Number.isFinite(price) || price <= 0 || (quantity != null && !(Number(quantity) > 0))) {
+    return NextResponse.json({ error: 'Price and quantity must be greater than 0' }, { status: 400 });
+  }
 
   // Only regular customers can make credit purchases
   const customer = await prisma.customer.findUnique({ where: { id: customerId } });
