@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import { getStoredOtp, clearStoredOtp } from '../send/route';
+import { verifyOtp } from '@/lib/otp';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -11,23 +11,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'OTP is required' }, { status: 400 });
   }
 
-  const stored = getStoredOtp();
+  const result = await verifyOtp('clear-data', otp);
 
-  if (!stored) {
-    return NextResponse.json({ error: 'No OTP was requested. Please request a new one.' }, { status: 400 });
+  if (!result.ok) {
+    const errors = {
+      none: 'No OTP was requested. Please request a new one.',
+      expired: 'OTP has expired. Please request a new one.',
+      locked: 'Too many wrong attempts. Please request a new OTP.',
+      invalid: 'Invalid OTP. Please try again.',
+    };
+    return NextResponse.json({ error: errors[result.reason] }, { status: 400 });
   }
-
-  if (Date.now() > stored.expiresAt) {
-    clearStoredOtp();
-    return NextResponse.json({ error: 'OTP has expired. Please request a new one.' }, { status: 400 });
-  }
-
-  if (String(otp).trim() !== stored.code) {
-    return NextResponse.json({ error: 'Invalid OTP. Please try again.' }, { status: 400 });
-  }
-
-  // OTP verified — clear all data
-  clearStoredOtp();
 
   try {
     console.log('[CLEAR DATA] OTP verified. Clearing all database tables...');
@@ -45,6 +39,7 @@ export async function POST(req: NextRequest) {
     await prisma.customer.deleteMany();
     await prisma.settings.deleteMany();
     await prisma.user.deleteMany();
+    await prisma.otpCode.deleteMany();
 
     // Re-create default admin user
     const passwordHash = await bcrypt.hash('admin123', 10);

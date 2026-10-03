@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getDriverId, unauthorizedDriver } from '@/lib/driverAuth';
 
 // GET: Get today's session for a driver
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const driverId = parseInt(searchParams.get('driverId') || '0');
-
-  if (!driverId) {
-    return NextResponse.json({ error: 'driverId is required' }, { status: 400 });
-  }
+  const driverId = getDriverId(req);
+  if (!driverId) return unauthorizedDriver();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -23,12 +20,11 @@ export async function GET(req: NextRequest) {
 
 // POST: Start daily operation
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { driverId, lorryId } = body;
+  const driverId = getDriverId(req);
+  if (!driverId) return unauthorizedDriver();
 
-  if (!driverId) {
-    return NextResponse.json({ error: 'driverId is required' }, { status: 400 });
-  }
+  const body = await req.json();
+  const { lorryId } = body;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -68,11 +64,20 @@ export async function POST(req: NextRequest) {
 
 // PATCH: Stop daily operation
 export async function PATCH(req: NextRequest) {
+  const driverId = getDriverId(req);
+  if (!driverId) return unauthorizedDriver();
+
   const body = await req.json();
   const { sessionId } = body;
 
   if (!sessionId) {
     return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+  }
+
+  // Drivers can only stop their own session
+  const owned = await prisma.driverSession.findFirst({ where: { id: sessionId, driverId }, select: { id: true } });
+  if (!owned) {
+    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
 
   const session = await prisma.driverSession.update({

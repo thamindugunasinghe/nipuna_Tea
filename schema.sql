@@ -245,3 +245,14 @@ ALTER TABLE "driver_sessions" ADD CONSTRAINT "driver_sessions_driver_id_fkey" FO
 -- AddForeignKey
 ALTER TABLE "driver_sessions" ADD CONSTRAINT "driver_sessions_lorry_id_fkey" FOREIGN KEY ("lorry_id") REFERENCES "lorries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+
+-- One-time codes for driver login and clear-data confirmation
+CREATE TABLE IF NOT EXISTS "otp_codes" (
+    "key" TEXT NOT NULL,
+    "code_hash" TEXT NOT NULL,
+    "driver_id" INTEGER,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "otp_codes_pkey" PRIMARY KEY ("key")
+);

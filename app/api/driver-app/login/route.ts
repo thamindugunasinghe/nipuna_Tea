@@ -1,23 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-
-// Use globalThis to survive Next.js hot reloads in dev
-const globalForDriverOtp = globalThis as unknown as {
-  __driverOtps?: Map<string, { code: string; expiresAt: number; driverId: number }>;
-};
-
-if (!globalForDriverOtp.__driverOtps) {
-  globalForDriverOtp.__driverOtps = new Map();
-}
-const driverOtps = globalForDriverOtp.__driverOtps;
-
-export function getDriverOtp(phone: string) {
-  return driverOtps.get(phone) || null;
-}
-
-export function clearDriverOtp(phone: string) {
-  driverOtps.delete(phone);
-}
+import { normalizePhone } from '@/lib/driverAuth';
+import { createOtp } from '@/lib/otp';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -27,17 +11,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
   }
 
-  // Normalize phone: remove spaces, ensure format
-  const normalizedPhone = phone.replace(/\s/g, '').replace(/^0/, '94');
+  const phoneKey = normalizePhone(String(phone));
+  if (phoneKey.length !== 9) {
+    return NextResponse.json({ error: 'Invalid phone number / වැරදි දුරකථන අංකය' }, { status: 400 });
+  }
 
-  // Find driver by phone
-  const driver = await prisma.driver.findFirst({
-    where: {
-      phone: { contains: phone.replace(/^0/, '').replace(/^94/, '') },
-      active: true,
-    },
-    include: { lorry: true },
+  // Exact match on the last 9 digits (stored numbers may be 07X..., 947X... or +94 7X...)
+  const drivers = await prisma.driver.findMany({
+    where: { active: true, phone: { not: null } },
+    select: { id: true, name: true, phone: true },
   });
+  const matches = drivers.filter(d => normalizePhone(d.phone!) === phoneKey);
+
+  if (matches.length > 1) {
+    return NextResponse.json({ error: 'This phone number is registered to more than one driver. Please contact admin.' }, { status: 409 });
+  }
+  const driver = matches[0];
 
   if (!driver) {
     return NextResponse.json({ error: 'Driver not found. Please register with admin first. / රියදුරු හමු නොවීය. කරුණාකර පළමුව ඇඩ්මින් සමඟ ලියාපදිංචි වන්න.' }, { status: 404 });
@@ -47,20 +36,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No phone number registered for this driver.' }, { status: 400 });
   }
 
-  // Generate 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-  // Store with 5-minute expiry
-  driverOtps.set(phone, {
-    code: otp,
-    expiresAt: Date.now() + 5 * 60 * 1000,
-    driverId: driver.id,
-  });
+  const created = await createOtp(`driver:${phoneKey}`, driver.id);
+  if (!created.ok) {
+    return NextResponse.json({
+      error: `Please wait ${created.retryAfterSec}s before requesting a new OTP. / තත්පර ${created.retryAfterSec} කින් නැවත උත්සාහ කරන්න.`,
+    }, { status: 429 });
+  }
+  const otp = created.code;
 
   const apiToken = process.env.TEXTLK_API_TOKEN?.trim();
   if (!apiToken) {
     // In dev mode, log OTP to console
-    console.log(`[DRIVER OTP] OTP for ${phone}: ${otp}`);
+    if (process.env.NODE_ENV === 'development') console.log(`[DRIVER OTP] OTP for ${phoneKey}: ${otp}`);
     return NextResponse.json({
       success: true,
       driverId: driver.id,

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getDriverId, unauthorizedDriver } from '@/lib/driverAuth';
 import { sendCollectionSms } from '@/lib/sms';
 
 // GET: Get collections by driver for today
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const driverId = parseInt(searchParams.get('driverId') || '0');
-  const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+  const driverId = getDriverId(req);
+  if (!driverId) return unauthorizedDriver();
 
-  if (!driverId) {
-    return NextResponse.json({ error: 'driverId is required' }, { status: 400 });
-  }
+  const { searchParams } = new URL(req.url);
+  const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
 
   const dateStart = new Date(date);
   dateStart.setHours(0, 0, 0, 0);
@@ -37,11 +36,14 @@ export async function GET(req: NextRequest) {
 
 // POST: Record a tea collection
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { driverId, lorryId, customerId, kilosByDriver, waterDeduction, packagingDeduction } = body;
+  const driverId = getDriverId(req);
+  if (!driverId) return unauthorizedDriver();
 
-  if (!driverId || !customerId || !kilosByDriver) {
-    return NextResponse.json({ error: 'driverId, customerId, and kilosByDriver are required' }, { status: 400 });
+  const body = await req.json();
+  const { lorryId, customerId, kilosByDriver, waterDeduction, packagingDeduction } = body;
+
+  if (!customerId || !kilosByDriver) {
+    return NextResponse.json({ error: 'customerId and kilosByDriver are required' }, { status: 400 });
   }
 
   const kilos = parseFloat(kilosByDriver);

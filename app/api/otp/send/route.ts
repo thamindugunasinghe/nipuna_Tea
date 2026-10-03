@@ -1,30 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-// Use globalThis to survive Next.js hot reloads in dev
-const globalForOtp = globalThis as unknown as {
-  __clearDataOtp?: { code: string; expiresAt: number } | null;
-};
-
-export function getStoredOtp() {
-  return globalForOtp.__clearDataOtp || null;
-}
-
-export function clearStoredOtp() {
-  globalForOtp.__clearDataOtp = null;
-}
+import { NextResponse } from 'next/server';
+import { createOtp } from '@/lib/otp';
 
 export async function POST() {
-  // Generate 6-digit OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  
-  // Store with 5-minute expiry (on globalThis to survive hot reloads)
-  globalForOtp.__clearDataOtp = {
-    code: otp,
-    expiresAt: Date.now() + 5 * 60 * 1000,
-  };
+  const created = await createOtp('clear-data');
+  if (!created.ok) {
+    return NextResponse.json({ error: `Please wait ${created.retryAfterSec}s before requesting a new OTP.` }, { status: 429 });
+  }
+  const otp = created.code;
+  const isDev = process.env.NODE_ENV === 'development';
 
   const apiToken = process.env.TEXTLK_API_TOKEN?.trim();
   if (!apiToken) {
+    if (!isDev) {
+      return NextResponse.json({ error: 'SMS is not configured. Cannot send OTP.' }, { status: 500 });
+    }
     console.log(`[OTP] No API token configured. OTP code: ${otp}`);
     return NextResponse.json({ success: true, message: 'OTP generated (no SMS configured)', devOtp: otp });
   }
@@ -61,19 +50,17 @@ export async function POST() {
         if (parsed.message) errorMsg = parsed.message;
       } catch {}
       // Still return the OTP for dev/testing when SMS fails
-      console.log(`[OTP] SMS failed but OTP generated: ${otp}`);
       return NextResponse.json({ 
         error: errorMsg + ' (OTP logged to console)', 
-        devOtp: process.env.NODE_ENV === 'development' ? otp : undefined 
+        devOtp: isDev ? otp : undefined 
       }, { status: 500 });
     }
 
-    console.log(`[OTP] Sent OTP ${otp} to +94702111487`);
+    console.log('[OTP] Sent clear-data OTP to +94702111487');
     return NextResponse.json({ success: true, message: 'OTP sent to registered mobile number' });
 
   } catch (error) {
     console.error('[OTP] Error sending SMS:', error);
-    console.log(`[OTP] Error but OTP generated: ${otp}`);
     return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 });
   }
 }
