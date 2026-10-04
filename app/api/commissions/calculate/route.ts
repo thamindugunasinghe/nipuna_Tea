@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { round2 } from '@/lib/billing';
+import { commissionPeriod, round2 } from '@/lib/billing';
 
+// Calculate driver commissions for a period (26th of previous month – 25th of this month), on net kilos.
+//
+// Each collection is counted in exactly one commission (tea_collections.driver_commission_id):
+//  - Takes every collection up to the 25th that is not yet in any commission,
+//    including late entries from earlier periods.
+//  - Paid commissions are never changed. Late tea for a paid period goes to the next period.
+//  - Recalculating an unpaid commission re-collects its tea (picks up new entries).
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { month, year, pricePerKilo } = body;
@@ -9,45 +16,73 @@ export async function POST(req: NextRequest) {
   if (!month || !year || !pricePerKilo) {
     return NextResponse.json({ error: 'Month, year, and price per kilo are required' }, { status: 400 });
   }
-  if (!Number.isFinite(Number(pricePerKilo)) || Number(pricePerKilo) <= 0) {
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year)) {
+    return NextResponse.json({ error: 'Invalid month or year' }, { status: 400 });
+  }
+  const price = Number(pricePerKilo);
+  if (!Number.isFinite(price) || price <= 0) {
     return NextResponse.json({ error: 'Price per kilo must be a number greater than 0' }, { status: 400 });
   }
 
-  // Commissions already marked paid are never changed by recalculating
-  // (otherwise they would flip back to unpaid and the driver could be paid twice)
-  const paidAlready = await prisma.driverCommission.findMany({
-    where: { month, year, paid: true },
-    select: { driverId: true },
-  });
-  const paidDriverIds = new Set(paidAlready.map(c => c.driverId));
+  const period = commissionPeriod(month, year);
 
-  const drivers = await prisma.driver.findMany({ 
-    where: { active: true },
-    include: {
-      teaCollections: {
-        where: { month, year, kilosValidated: { not: null } },
-        select: { kilosValidated: true }
-      }
+  const result = await prisma.$transaction(async (tx) => {
+    const existing = await tx.driverCommission.findMany({ where: { month, year } });
+    const paidDriverIds = new Set(existing.filter(c => c.paid).map(c => c.driverId));
+    const unpaid = existing.filter(c => !c.paid);
+
+    // Release tea held by unpaid commissions of this period, so it is counted fresh
+    if (unpaid.length > 0) {
+      await tx.teaCollection.updateMany({
+        where: { driverCommissionId: { in: unpaid.map(c => c.id) } },
+        data: { driverCommissionId: null },
+      });
     }
-  });
 
-  const upserts = drivers.map(driver => {
-    if (paidDriverIds.has(driver.id)) return null;
-
-    const totalKilos = round2(driver.teaCollections.reduce((sum, c) => sum + (c.kilosValidated as number), 0));
-    if (totalKilos === 0) return null;
-
-    const commissionAmount = round2(totalKilos * pricePerKilo);
-
-    return prisma.driverCommission.upsert({
-      where: { driverId_month_year: { driverId: driver.id, month, year } },
-      update: { totalKilos, pricePerKilo, commissionRate: 0, commissionAmount },
-      create: { driverId: driver.id, month, year, totalKilos, pricePerKilo, commissionRate: 0, commissionAmount },
+    // All tea up to the 25th that is not in any commission yet
+    const eligible = await tx.teaCollection.findMany({
+      where: {
+        driverId: { not: null },
+        driverCommissionId: null,
+        kilosValidated: { not: null },
+        collectionDate: { lt: period.endExclusive },
+      },
+      select: { id: true, driverId: true, kilosValidated: true },
     });
-  }).filter((u): u is NonNullable<typeof u> => u !== null);
 
-  const results = upserts.length > 0 ? await prisma.$transaction(upserts) : [];
+    const byDriver = new Map<number, { ids: number[]; kilos: number }>();
+    for (const c of eligible) {
+      if (paidDriverIds.has(c.driverId!)) continue; // paid period: their late tea waits for next period
+      const entry = byDriver.get(c.driverId!) || { ids: [], kilos: 0 };
+      entry.ids.push(c.id);
+      entry.kilos += c.kilosValidated as number;
+      byDriver.set(c.driverId!, entry);
+    }
 
-  // Response stays an array of updated commissions; skippedPaid tells the page how many were left alone
-  return NextResponse.json(results, { headers: { 'X-Skipped-Paid': String(paidDriverIds.size) } });
+    const saved = [];
+    for (const [driverId, { ids, kilos }] of byDriver) {
+      const totalKilos = round2(kilos);
+      const commissionAmount = round2(totalKilos * price);
+      const commission = await tx.driverCommission.upsert({
+        where: { driverId_month_year: { driverId, month, year } },
+        update: { totalKilos, pricePerKilo: price, commissionRate: 0, commissionAmount },
+        create: { driverId, month, year, totalKilos, pricePerKilo: price, commissionRate: 0, commissionAmount },
+      });
+      await tx.teaCollection.updateMany({
+        where: { id: { in: ids }, driverCommissionId: null },
+        data: { driverCommissionId: commission.id },
+      });
+      saved.push(commission);
+    }
+
+    // Unpaid commissions that no longer have any tea are removed
+    const emptied = unpaid.filter(c => !byDriver.has(c.driverId));
+    if (emptied.length > 0) {
+      await tx.driverCommission.deleteMany({ where: { id: { in: emptied.map(c => c.id) }, paid: false } });
+    }
+
+    return { saved, skippedPaid: paidDriverIds.size };
+  }, { timeout: 30000 });
+
+  return NextResponse.json(result.saved, { headers: { 'X-Skipped-Paid': String(result.skippedPaid) } });
 }

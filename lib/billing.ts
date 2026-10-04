@@ -12,6 +12,15 @@ export function numSetting(value: unknown, fallback: number) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// Driver commission period for a month: 26th of the previous month to the 25th of this month.
+// Collection dates are stored as UTC midnight, so the boundaries are UTC too.
+export function commissionPeriod(month: number, year: number) {
+  const start = new Date(Date.UTC(year, month - 2, 26));
+  const end = new Date(Date.UTC(year, month - 1, 25)); // last day included
+  const endExclusive = new Date(Date.UTC(year, month - 1, 26));
+  return { start, end, endExclusive };
+}
+
 export interface InstantRates {
   transportCostPerKilo: number;
   stampCostPerKilo: number;

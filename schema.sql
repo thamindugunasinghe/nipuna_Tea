@@ -278,3 +278,8 @@ ALTER TABLE "tea_collections"
   ADD COLUMN IF NOT EXISTS "instant_stamp" DOUBLE PRECISION,
   ADD COLUMN IF NOT EXISTS "instant_other" DOUBLE PRECISION,
   ADD COLUMN IF NOT EXISTS "instant_net_pay" DOUBLE PRECISION;
+
+-- Which driver commission each collection is counted in
+ALTER TABLE "tea_collections" ADD COLUMN IF NOT EXISTS "driver_commission_id" INTEGER;
+CREATE INDEX IF NOT EXISTS "tea_collections_driver_commission_id_idx" ON "tea_collections"("driver_commission_id");
+ALTER TABLE "tea_collections" ADD CONSTRAINT "tea_collections_driver_commission_id_fkey" FOREIGN KEY ("driver_commission_id") REFERENCES "driver_commissions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
