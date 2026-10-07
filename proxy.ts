@@ -22,6 +22,7 @@ export async function proxy(req: NextRequest) {
   const adminOnly =
     path === '/api/users' || path.startsWith('/api/users/') ||
     path.startsWith('/api/otp/') ||
+    /^\/api\/factory-deliveries\/\d+\/dismiss$/.test(path) ||
     (path === '/api/settings' && req.method !== 'GET');
   if (adminOnly && token.role !== 'admin') {
     return NextResponse.json({ error: 'Only admin can do this / ඇඩ්මින්ට පමණි' }, { status: 403 });

@@ -13,6 +13,10 @@ const pageTitleMap: Record<string, string> = {
   '/fleet': 'fleet.title',
   '/payments': 'payments.title',
   '/commissions': 'commissions.title',
+  '/factory-deliveries': 'nav.factoryDeliveries',
+  '/validation': 'nav.validation',
+  '/instant-cash': 'nav.instantCash',
+  '/online-drivers': 'nav.onlineDrivers',
   '/settings': 'settings.title',
   '/users': 'users.title',
 };

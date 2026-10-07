@@ -12,6 +12,13 @@ export function numSetting(value: unknown, fallback: number) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// "2026-10-04" -> Date at UTC midnight (how date-only values are stored). null if invalid.
+export function parseDay(value: unknown) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 // Driver commission period for a month: 26th of the previous month to the 25th of this month.
 // Collection dates are stored as UTC midnight, so the boundaries are UTC too.
 export function commissionPeriod(month: number, year: number) {

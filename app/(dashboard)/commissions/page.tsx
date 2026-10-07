@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { useTranslation } from '@/lib/i18n';
-import { Calculator, CheckCircle, Printer, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calculator, CheckCircle, Printer, ChevronDown, ChevronRight, Leaf, Truck } from 'lucide-react';
 import Toast, { useToast } from '@/components/Toast';
 import { printReceipt } from '@/lib/printReceipt';
 
@@ -31,16 +31,19 @@ export default function CommissionsPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(currentPeriodMonth());
   const [pricePerKilo, setPricePerKilo] = useState('');
+  // collection = tea collected from customers; delivery = tea taken to factories in our lorry
+  const [type, setType] = useState<'collection' | 'delivery'>('collection');
+  const isDelivery = type === 'delivery';
 
   const [year, month] = selectedMonth.split('-').map(Number);
 
-  useEffect(() => { fetchCommissions(); }, [selectedMonth]);
+  useEffect(() => { fetchCommissions(); }, [selectedMonth, type]);
 
   const fetchCommissions = async () => {
     if (!month || !year) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/commissions?month=${month}&year=${year}`);
+      const res = await fetch(`/api/commissions?month=${month}&year=${year}&type=${type}`);
       if (res.ok) {
         const data = await res.json();
         setCommissions(data.commissions);
@@ -51,13 +54,13 @@ export default function CommissionsPage() {
   };
 
   const handleCalculate = async () => {
-    if (!pricePerKilo) { showToast(t('payments.enterPrice'), 'warning'); return; }
+    if (!isDelivery && !pricePerKilo) { showToast(t('payments.enterPrice'), 'warning'); return; }
     setCalculating(true);
     try {
       const res = await fetch('/api/commissions/calculate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, year, pricePerKilo: parseFloat(pricePerKilo) }),
+        body: JSON.stringify({ month, year, type, pricePerKilo: isDelivery ? undefined : parseFloat(pricePerKilo) }),
       });
       if (res.ok) {
         const skipped = parseInt(res.headers.get('X-Skipped-Paid') || '0');
@@ -100,7 +103,7 @@ export default function CommissionsPage() {
       totalKilos: c.totalKilos,
       pricePerKilo: c.pricePerKilo,
       commissionAmount: c.commissionAmount,
-      month: `${months[month - 1]} (${periodLabel})`,
+      month: `${months[month - 1]} (${periodLabel})${isDelivery ? ' — Factory delivery' : ''}`,
       year: year,
     });
   };
@@ -111,6 +114,17 @@ export default function CommissionsPage() {
 
       <div className="page-header"><h1>{t('commissions.title')}</h1></div>
 
+      <div className="tabs" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
+        <button className={`tab ${!isDelivery ? 'active' : ''}`} onClick={() => { setType('collection'); setExpanded(null); }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Leaf size={16} /> Tea Collection / තේ එකතු කිරීම
+        </button>
+        <button className={`tab ${isDelivery ? 'active' : ''}`} onClick={() => { setType('delivery'); setExpanded(null); }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Truck size={16} /> Factory Delivery / කර්මාන්තශාලා ප්‍රවාහනය
+        </button>
+      </div>
+
       <div className="card" style={{ marginBottom: '24px' }}>
         <div className="card-body">
           <div className="form-row" style={{ alignItems: 'flex-end' }}>
@@ -118,10 +132,12 @@ export default function CommissionsPage() {
               <label className="form-label">Month / මාසය</label>
               <input type="month" className="form-input" value={selectedMonth} onChange={(e) => e.target.value && setSelectedMonth(e.target.value)} />
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{t('payments.pricePerKilo')}</label>
-              <input type="number" step="0.01" className="form-input" value={pricePerKilo} onChange={(e) => setPricePerKilo(e.target.value)} />
-            </div>
+            {!isDelivery && (
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">{t('payments.pricePerKilo')}</label>
+                <input type="number" step="0.01" className="form-input" value={pricePerKilo} onChange={(e) => setPricePerKilo(e.target.value)} />
+              </div>
+            )}
             <button className="btn btn-primary" onClick={handleCalculate} disabled={calculating}>
               <Calculator size={18} /> {calculating ? t('common.loading') : t('commissions.calculateCommissions')}
             </button>
@@ -129,7 +145,10 @@ export default function CommissionsPage() {
           {period && (
             <p style={{ marginTop: '12px', color: 'var(--gray-500)', fontSize: '13px' }}>
               Period / කාලය: <strong style={{ color: 'var(--gray-800)' }}>{periodLabel}</strong>
-              {' '}· net kilos · tea added late for an earlier period is included and marked <span className="badge badge-amber" style={{ fontSize: '10px' }}>Late</span>
+              {isDelivery
+                ? ' · tea sent to factories in our lorry × the rate saved on each delivery (Factory Deliveries → Factories)'
+                : ' · net kilos'}
+              {' '}· items added late for an earlier period are included and marked <span className="badge badge-amber" style={{ fontSize: '10px' }}>Late</span>
             </p>
           )}
         </div>
@@ -158,7 +177,9 @@ export default function CommissionsPage() {
                     <td>{i + 1}</td>
                     <td style={{ fontWeight: 600 }}>
                       {expanded === c.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {c.driver?.name}
-                      <div style={{ fontSize: '12px', color: 'var(--gray-400)', fontWeight: 400 }}>{c.collections.length} collections</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-400)', fontWeight: 400 }}>
+                        {isDelivery ? `${c.deliveries.length} deliveries` : `${c.collections.length} collections`}
+                      </div>
                     </td>
                     <td>{c.totalKilos.toLocaleString()} {t('common.kg')}</td>
                     <td>{t('common.rs')} {c.pricePerKilo}</td>
@@ -178,33 +199,56 @@ export default function CommissionsPage() {
                   {expanded === c.id && (
                     <tr>
                       <td colSpan={7} style={{ background: 'var(--gray-50)', padding: '8px 16px 16px' }}>
-                        <table className="table" style={{ fontSize: '13px' }}>
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Customer</th>
-                              <th>Gross</th>
-                              <th>Water</th>
-                              <th>Packaging</th>
-                              <th>Net</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {c.collections.map((col: any) => (
-                              <tr key={col.id}>
-                                <td>
-                                  {fmtDate(col.collectionDate)}
-                                  {col.late && <span className="badge badge-amber" style={{ fontSize: '10px', marginLeft: '6px' }}>Late</span>}
-                                </td>
-                                <td>{col.customer?.name}</td>
-                                <td>{col.kilosByDriver} kg</td>
-                                <td>{col.waterDeduction > 0 ? `- ${col.waterDeduction} kg` : '-'}</td>
-                                <td>{col.packagingDeduction > 0 ? `- ${col.packagingDeduction} kg` : '-'}</td>
-                                <td style={{ fontWeight: 600 }}>{col.kilosValidated} kg</td>
+                        {isDelivery ? (
+                          <table className="table" style={{ fontSize: '13px' }}>
+                            <thead>
+                              <tr><th>Date</th><th>Factory</th><th>Lorry</th><th>Tea sent</th><th>Rate</th><th>Amount</th></tr>
+                            </thead>
+                            <tbody>
+                              {c.deliveries.map((d: any) => (
+                                <tr key={d.id}>
+                                  <td>
+                                    {fmtDate(d.deliveryDate)}
+                                    {d.late && <span className="badge badge-amber" style={{ fontSize: '10px', marginLeft: '6px' }}>Late</span>}
+                                  </td>
+                                  <td>{d.factory?.name}</td>
+                                  <td>{d.lorry?.lorryNumber ?? '—'}</td>
+                                  <td>{d.teaSentKg} kg</td>
+                                  <td>{t('common.rs')} {d.commissionPerKg}</td>
+                                  <td style={{ fontWeight: 600 }}>{t('common.rs')} {(Math.round(d.teaSentKg * (d.commissionPerKg ?? 0) * 100) / 100).toLocaleString()}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <table className="table" style={{ fontSize: '13px' }}>
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Gross</th>
+                                <th>Water</th>
+                                <th>Packaging</th>
+                                <th>Net</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {c.collections.map((col: any) => (
+                                <tr key={col.id}>
+                                  <td>
+                                    {fmtDate(col.collectionDate)}
+                                    {col.late && <span className="badge badge-amber" style={{ fontSize: '10px', marginLeft: '6px' }}>Late</span>}
+                                  </td>
+                                  <td>{col.customer?.name}</td>
+                                  <td>{col.kilosByDriver} kg</td>
+                                  <td>{col.waterDeduction > 0 ? `- ${col.waterDeduction} kg` : '-'}</td>
+                                  <td>{col.packagingDeduction > 0 ? `- ${col.packagingDeduction} kg` : '-'}</td>
+                                  <td style={{ fontWeight: 600 }}>{col.kilosValidated} kg</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </td>
                     </tr>
                   )}

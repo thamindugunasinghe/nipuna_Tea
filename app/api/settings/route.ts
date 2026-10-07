@@ -16,6 +16,7 @@ const NUMERIC_KEYS = new Set([
   'stamp_cost_per_kilo',
   'other_deduction_pct',
   'other_deduction_rate',
+  'delivery_commission_per_kg',
 ]);
 
 export async function PUT(req: NextRequest) {

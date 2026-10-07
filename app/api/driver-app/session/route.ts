@@ -24,7 +24,21 @@ export async function POST(req: NextRequest) {
   if (!driverId) return unauthorizedDriver();
 
   const body = await req.json();
-  const { lorryId } = body;
+
+  // The driver chooses the lorry when starting operation.
+  // (Older app versions don't send it: fall back to the lorry that used to be assigned to the driver.)
+  let lorryId = parseInt(body.lorryId) || null;
+  if (!lorryId) {
+    const driver = await prisma.driver.findUnique({ where: { id: driverId }, select: { lorryId: true } });
+    lorryId = driver?.lorryId ?? null;
+  }
+  if (!lorryId) {
+    return NextResponse.json({ error: 'Please choose your lorry / කරුණාකර ලොරිය තෝරන්න' }, { status: 400 });
+  }
+  const lorry = await prisma.lorry.findFirst({ where: { id: lorryId, active: true } });
+  if (!lorry) {
+    return NextResponse.json({ error: 'Lorry not found / ලොරිය හමු නොවීය' }, { status: 400 });
+  }
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -38,10 +52,10 @@ export async function POST(req: NextRequest) {
     if (existing.isActive) {
       return NextResponse.json({ error: 'Operation already started today / අද මෙහෙයුම දැනටමත් ආරම්භ කර ඇත' }, { status: 400 });
     }
-    // Re-activate stopped session
+    // Re-activate stopped session (with the lorry chosen now)
     const session = await prisma.driverSession.update({
       where: { id: existing.id },
-      data: { isActive: true, stoppedAt: null },
+      data: { isActive: true, stoppedAt: null, lorryId },
       include: { lorry: true, driver: true },
     });
     return NextResponse.json({ session });
@@ -51,14 +65,14 @@ export async function POST(req: NextRequest) {
   const session = await prisma.driverSession.create({
     data: {
       driverId,
-      lorryId: lorryId || null,
+      lorryId,
       sessionDate: today,
       isActive: true,
     },
     include: { lorry: true, driver: true },
   });
 
-  console.log(`[SESSION] Driver ${driverId} started operation`);
+  console.log(`[SESSION] Driver ${driverId} started operation with lorry ${lorry.lorryNumber}`);
   return NextResponse.json({ session }, { status: 201 });
 }
 

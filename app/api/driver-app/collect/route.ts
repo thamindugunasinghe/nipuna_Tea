@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
       data: {
         customerId,
         driverId,
-        lorryId: lorryId || null,
+        // Lorry chosen when the driver started today's operation
+        lorryId: session.lorryId ?? (lorryId || null),
         kilosByDriver: kilos,
         waterDeduction: waterDed,
         packagingDeduction: packDed,

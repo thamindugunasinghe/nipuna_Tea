@@ -283,3 +283,64 @@ ALTER TABLE "tea_collections"
 ALTER TABLE "tea_collections" ADD COLUMN IF NOT EXISTS "driver_commission_id" INTEGER;
 CREATE INDEX IF NOT EXISTS "tea_collections_driver_commission_id_idx" ON "tea_collections"("driver_commission_id");
 ALTER TABLE "tea_collections" ADD CONSTRAINT "tea_collections_driver_commission_id_fkey" FOREIGN KEY ("driver_commission_id") REFERENCES "driver_commissions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Factory deliveries, factory cards, and delivery commission (driver_commissions.type)
+-- DropIndex
+DROP INDEX "driver_commissions_driver_id_month_year_key";
+-- AlterTable
+ALTER TABLE "driver_commissions" ADD COLUMN     "type" TEXT NOT NULL DEFAULT 'collection';
+-- CreateTable
+CREATE TABLE "factories" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "deduction_types" JSONB NOT NULL DEFAULT '[]',
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "factories_pkey" PRIMARY KEY ("id")
+);
+-- CreateTable
+CREATE TABLE "factory_deliveries" (
+    "id" SERIAL NOT NULL,
+    "delivery_date" TIMESTAMP(3) NOT NULL,
+    "factory_id" INTEGER NOT NULL,
+    "transport" TEXT NOT NULL DEFAULT 'ours',
+    "lorry_id" INTEGER,
+    "driver_id" INTEGER,
+    "factory_vehicle_no" TEXT,
+    "handed_over_kg" DOUBLE PRECISION NOT NULL,
+    "gunny_bags" BOOLEAN NOT NULL DEFAULT false,
+    "gunny_bag_kg" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "tea_sent_kg" DOUBLE PRECISION NOT NULL,
+    "commission_per_kg" DOUBLE PRECISION,
+    "driver_commission_id" INTEGER,
+    "note" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "card_received_kg" DOUBLE PRECISION,
+    "card_deductions" JSONB,
+    "card_total_deduction" DOUBLE PRECISION,
+    "card_accepted_kg" DOUBLE PRECISION,
+    "card_entered_at" TIMESTAMP(3),
+    "flag_dismissed_reason" TEXT,
+    "flag_dismissed_note" TEXT,
+    "flag_dismissed_by" TEXT,
+    "flag_dismissed_at" TIMESTAMP(3),
+    CONSTRAINT "factory_deliveries_pkey" PRIMARY KEY ("id")
+);
+-- CreateIndex
+CREATE UNIQUE INDEX "factories_name_key" ON "factories"("name");
+-- CreateIndex
+CREATE INDEX "factory_deliveries_delivery_date_idx" ON "factory_deliveries"("delivery_date");
+-- CreateIndex
+CREATE INDEX "factory_deliveries_factory_id_delivery_date_idx" ON "factory_deliveries"("factory_id", "delivery_date");
+-- CreateIndex
+CREATE INDEX "factory_deliveries_driver_commission_id_idx" ON "factory_deliveries"("driver_commission_id");
+-- CreateIndex
+CREATE UNIQUE INDEX "driver_commissions_driver_id_month_year_type_key" ON "driver_commissions"("driver_id", "month", "year", "type");
+-- AddForeignKey
+ALTER TABLE "factory_deliveries" ADD CONSTRAINT "factory_deliveries_factory_id_fkey" FOREIGN KEY ("factory_id") REFERENCES "factories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+-- AddForeignKey
+ALTER TABLE "factory_deliveries" ADD CONSTRAINT "factory_deliveries_lorry_id_fkey" FOREIGN KEY ("lorry_id") REFERENCES "lorries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- AddForeignKey
+ALTER TABLE "factory_deliveries" ADD CONSTRAINT "factory_deliveries_driver_id_fkey" FOREIGN KEY ("driver_id") REFERENCES "drivers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- AddForeignKey
+ALTER TABLE "factory_deliveries" ADD CONSTRAINT "factory_deliveries_driver_commission_id_fkey" FOREIGN KEY ("driver_commission_id") REFERENCES "driver_commissions"("id") ON DELETE SET NULL ON UPDATE CASCADE;

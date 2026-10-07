@@ -18,7 +18,7 @@ export default function FleetPage() {
   const [editingLorryId, setEditingLorryId] = useState<number | null>(null);
   const [editingDriverId, setEditingDriverId] = useState<number | null>(null);
   const [lorryForm, setLorryForm] = useState({ lorryNumber: '', capacity: '' });
-  const [driverForm, setDriverForm] = useState({ name: '', phone: '', nic: '', lorryId: '' });
+  const [driverForm, setDriverForm] = useState({ name: '', phone: '', nic: '' });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -67,13 +67,13 @@ export default function FleetPage() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...driverForm, lorryId: driverForm.lorryId ? parseInt(driverForm.lorryId) : null }),
+        body: JSON.stringify(driverForm),
       });
       if (res.ok) { 
         showToast(editingDriverId ? t('common.save') + ' Success' : t('fleet.addDriverSuccess'), 'success'); 
         setShowDriverModal(false); 
         refresh(); 
-        setDriverForm({ name: '', phone: '', nic: '', lorryId: '' }); 
+        setDriverForm({ name: '', phone: '', nic: '' }); 
         setEditingDriverId(null);
       }
       else showToast(t('common.error'), 'error');
@@ -108,7 +108,7 @@ export default function FleetPage() {
               setEditingLorryId(null);
               setShowLorryModal(true);
             } else {
-              setDriverForm({ name: '', phone: '', nic: '', lorryId: '' });
+              setDriverForm({ name: '', phone: '', nic: '' });
               setEditingDriverId(null);
               setShowDriverModal(true);
             }
@@ -130,15 +130,14 @@ export default function FleetPage() {
       {tab === 'lorries' ? (
         <div className="table-wrapper">
           <table className="table">
-            <thead><tr><th>#</th><th>{t('fleet.lorryNumber')}</th><th>{t('fleet.capacity')}</th><th>{t('fleet.drivers')}</th><th>{t('common.actions')}</th></tr></thead>
+            <thead><tr><th>#</th><th>{t('fleet.lorryNumber')}</th><th>{t('fleet.capacity')}</th><th>{t('common.actions')}</th></tr></thead>
             <tbody>
-              {lorries.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
+              {lorries.length === 0 ? <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
               : lorries.map((l, i) => (
                 <tr key={l.id}>
                   <td>{i + 1}</td>
                   <td style={{ fontWeight: 600 }}>{l.lorryNumber}</td>
                   <td>{l.capacity ? `${l.capacity} ${t('common.kg')}` : '-'}</td>
-                  <td>{l.drivers?.map((d: any) => d.name).join(', ') || '-'}</td>
                   <td>
                     <button className="btn btn-ghost btn-icon" onClick={() => {
                       setLorryForm({ lorryNumber: l.lorryNumber, capacity: l.capacity ? String(l.capacity) : '' });
@@ -155,19 +154,18 @@ export default function FleetPage() {
       ) : (
         <div className="table-wrapper">
           <table className="table">
-            <thead><tr><th>#</th><th>{t('fleet.driverName')}</th><th>{t('fleet.phone')}</th><th>{t('fleet.nic')}</th><th>{t('fleet.assignedLorry')}</th><th>{t('common.actions')}</th></tr></thead>
+            <thead><tr><th>#</th><th>{t('fleet.driverName')}</th><th>{t('fleet.phone')}</th><th>{t('fleet.nic')}</th><th>{t('common.actions')}</th></tr></thead>
             <tbody>
-              {drivers.length === 0 ? <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
+              {drivers.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}>{t('common.noData')}</td></tr>
               : drivers.map((d, i) => (
                 <tr key={d.id}>
                   <td>{i + 1}</td>
                   <td style={{ fontWeight: 600 }}>{d.name}</td>
                   <td>{d.phone || '-'}</td>
                   <td>{d.nic || '-'}</td>
-                  <td>{d.lorry?.lorryNumber || '-'}</td>
                   <td>
                     <button className="btn btn-ghost btn-icon" onClick={() => {
-                      setDriverForm({ name: d.name, phone: d.phone || '', nic: d.nic || '', lorryId: d.lorryId ? String(d.lorryId) : '' });
+                      setDriverForm({ name: d.name, phone: d.phone || '', nic: d.nic || '' });
                       setEditingDriverId(d.id);
                       setShowDriverModal(true);
                     }}><Edit2 size={16} /></button>
@@ -212,13 +210,7 @@ export default function FleetPage() {
             <input className="form-input" value={driverForm.nic} onChange={(e) => setDriverForm({ ...driverForm, nic: e.target.value })} />
           </div>
         </div>
-        <div className="form-group">
-          <label className="form-label">{t('fleet.assignedLorry')}</label>
-          <select className="form-select" value={driverForm.lorryId} onChange={(e) => setDriverForm({ ...driverForm, lorryId: e.target.value })}>
-            <option value="">-</option>
-            {lorries.map(l => <option key={l.id} value={l.id}>{l.lorryNumber}</option>)}
-          </select>
-        </div>
+        <p className="form-help">The driver chooses the lorry each day when starting operation in the driver app.</p>
       </Modal>
     </div>
   );

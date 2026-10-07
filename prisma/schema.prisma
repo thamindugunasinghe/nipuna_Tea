@@ -47,10 +47,11 @@ model Lorry {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  drivers          Driver[]
-  teaCollections   TeaCollection[]
-  lorryValidations LorryValidation[]
-  driverSessions   DriverSession[]
+  drivers           Driver[]
+  teaCollections    TeaCollection[]
+  lorryValidations  LorryValidation[]
+  driverSessions    DriverSession[]
+  factoryDeliveries FactoryDelivery[]
 
   @@map("lorries")
 }
@@ -69,6 +70,7 @@ model Driver {
   teaCollections    TeaCollection[]
   driverCommissions DriverCommission[]
   sessions          DriverSession[]
+  factoryDeliveries FactoryDelivery[]
 
   @@map("drivers")
 }
@@ -216,15 +218,18 @@ model DriverCommission {
   pricePerKilo     Float     @map("price_per_kilo")
   commissionRate   Float     @default(5) @map("commission_rate")
   commissionAmount Float     @map("commission_amount")
+  // collection = tea collected from customers; delivery = tea taken to factories in our lorry
+  type             String    @default("collection")
   paid             Boolean   @default(false)
   paidAt           DateTime? @map("paid_at")
   createdAt        DateTime  @default(now()) @map("created_at")
 
-  driver      Driver          @relation(fields: [driverId], references: [id])
+  driver      Driver            @relation(fields: [driverId], references: [id])
   collections TeaCollection[]
+  deliveries  FactoryDelivery[]
 
   // month/year = commission period: 26th of previous month to 25th of this month
-  @@unique([driverId, month, year])
+  @@unique([driverId, month, year, type])
   @@index([year, month])
   @@map("driver_commissions")
 }
@@ -267,4 +272,66 @@ model DriverSession {
   @@unique([driverId, sessionDate])
   @@index([sessionDate])
   @@map("driver_sessions")
+}
+
+// Factories the tea is sold to. Each has its own deduction names (as printed on their card).
+model Factory {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  deductionTypes Json     @default("[]") @map("deduction_types") // e.g. ["Water", "Crates", "Mature leaves"]
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  deliveries FactoryDelivery[]
+
+  @@map("factories")
+}
+
+// One load of tea handed over to a factory, and (later) what the factory card says about it.
+model FactoryDelivery {
+  id           Int      @id @default(autoincrement())
+  deliveryDate DateTime @map("delivery_date") // date only (UTC midnight)
+  factoryId    Int      @map("factory_id")
+
+  // Transport: "ours" (our lorry + driver, driver earns delivery commission) or "factory" (their own lorry)
+  transport        String  @default("ours")
+  lorryId          Int?    @map("lorry_id")
+  driverId         Int?    @map("driver_id")
+  factoryVehicleNo String? @map("factory_vehicle_no")
+
+  // Weights at our side
+  handedOverKg Float   @map("handed_over_kg") // scale reading, incl. factory gunny bags if any
+  gunnyBags    Boolean @default(false) @map("gunny_bags")
+  gunnyBagKg   Float   @default(0) @map("gunny_bag_kg") // total weight of the factory's bags
+  teaSentKg    Float   @map("tea_sent_kg") // handedOverKg - gunnyBagKg
+
+  // Delivery commission (our lorry only): rate at the time of recording
+  commissionPerKg    Float? @map("commission_per_kg")
+  driverCommissionId Int?   @map("driver_commission_id")
+
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Factory card (filled in later)
+  cardReceivedKg     Float?    @map("card_received_kg")
+  cardDeductions     Json?     @map("card_deductions") // { "Water": 10, "Crates": 5 }
+  cardTotalDeduction Float?    @map("card_total_deduction")
+  cardAcceptedKg     Float?    @map("card_accepted_kg")
+  cardEnteredAt      DateTime? @map("card_entered_at")
+
+  // Admin dismissed the flags for this delivery (e.g. rain); not used for learning "normal"
+  flagDismissedReason String?   @map("flag_dismissed_reason")
+  flagDismissedNote   String?   @map("flag_dismissed_note")
+  flagDismissedBy     String?   @map("flag_dismissed_by")
+  flagDismissedAt     DateTime? @map("flag_dismissed_at")
+
+  factory          Factory           @relation(fields: [factoryId], references: [id])
+  lorry            Lorry?            @relation(fields: [lorryId], references: [id])
+  driver           Driver?           @relation(fields: [driverId], references: [id])
+  driverCommission DriverCommission? @relation(fields: [driverCommissionId], references: [id], onDelete: SetNull)
+
+  @@index([deliveryDate])
+  @@index([factoryId, deliveryDate])
+  @@index([driverCommissionId])
+  @@map("factory_deliveries")
 }

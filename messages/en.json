@@ -58,7 +58,8 @@
     "commissions": "Driver Commissions",
     "settings": "Settings",
     "users": "User Management",
-    "instantCash": "Instant Cash"
+    "instantCash": "Instant Cash",
+    "factoryDeliveries": "Factory Deliveries"
   },
   "login": {
     "title": "Login to Nipuna Tea Collectors",

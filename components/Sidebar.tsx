@@ -19,6 +19,7 @@ import {
   UserCog,
   Wifi,
   Banknote,
+  Factory,
 } from 'lucide-react';
 
 const navItems = [
@@ -31,6 +32,7 @@ const navItems = [
   { href: '/purchases', icon: ShoppingCart, labelKey: 'nav.purchases' },
   { href: '/fleet', icon: Truck, labelKey: 'nav.fleet' },
   { href: '/payments', icon: DollarSign, labelKey: 'nav.payments' },
+  { href: '/factory-deliveries', icon: Factory, labelKey: 'nav.factoryDeliveries' },
   { href: '/commissions', icon: Award, labelKey: 'nav.commissions' },
   { href: '/settings', icon: Settings, labelKey: 'nav.settings' },
   { href: '/users', icon: UserCog, labelKey: 'nav.users', adminOnly: true },
